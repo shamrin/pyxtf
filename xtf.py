@@ -3,6 +3,9 @@ import re
 import struct
 from pprint import pprint, pformat
 from collections import OrderedDict
+from itertools import groupby
+
+import numpy as np
 
 CHAN_TYPES = {
     0: 'SUBBOTTOM',
@@ -24,7 +27,7 @@ HEADER_TYPES = {
 }
 HEADER_LEN = 1024
 
-def main(infile):
+def readxtf(infile):
     file_data = memoryview(open(infile, 'rb').read())
     header_len, header = unwrap(file_data,
                                 """B file_format == 0x7b !
@@ -61,12 +64,13 @@ def main(infile):
                                    f MRU_offset_pitch
                                    f MRU_offset_roll
                                 """, dict_factory=OrderedDict)
-    #pprint(header.items())
+    pprint(header.items())
     nchannels = (header['number_of_sonar_channels'] +
                  header['number_of_bathimetry_channels'])
     assert nchannels <= 6
+    print 'Channels:'
     for i in range(nchannels):
-        chan_info_len, chan_info = unwrap(file_data[header_len+i*CHAN_INFO_LEN:],
+        chaninfo_len, chaninfo = unwrap(file_data[header_len+i*CHAN_INFO_LEN:],
                                           """B type_of_channel
                                              B sub_channel_number
                                              H correction_flags
@@ -88,15 +92,18 @@ def main(infile):
                                              H beams_per_array
                                              54s reserved2
                                           """, dict_factory=OrderedDict)
-        assert chan_info_len == CHAN_INFO_LEN
-        #pprint(chan_info.items())
-        print chan_info['sub_channel_number'], \
-              CHAN_TYPES[chan_info['type_of_channel']], \
-              chan_info['channel_name']
+        assert chaninfo_len == CHAN_INFO_LEN
+        print '  ', i, chaninfo['sub_channel_number'], \
+              CHAN_TYPES[chaninfo['type_of_channel']], \
+              chaninfo['channel_name']
+        #pprint(chaninfo.items())
 
     i = 0
     pstart = HEADER_LEN
     while file_data[pstart:]:
+        sys.stdout.write('\rtrace % 4d' % i)
+        sys.stdout.flush()
+
         pheader_len, pheader = unwrap(file_data[pstart:],
                                       """H magic_number == 0xFACE !
                                          B header_type
@@ -184,13 +191,14 @@ def main(infile):
                                           """, 'XTFPINGHEADER',
                                           dict_factory=OrderedDict)
             assert pheader_len + sheader_len == 256
-            if i % 100 == 0:
-                print '% 5d' % i, header_type
-                pprint(pheader.items())
-                pprint(sheader.items())
+
+            #if i % 99 == 0:
+            #    print '% 5d' % i, header_type
+            #    pprint(pheader.items())
+            #    pprint(sheader.items())
 
             assert pheader['num_chans_to_follow'] <= 6
-            for j in range(pheader['num_chans_to_follow']):
+            for channel in range(pheader['num_chans_to_follow']):
                 cheader_len, cheader = unwrap(file_data[pstart + pheader_len +
                                                         sheader_len:],
                                               """H channel_number
@@ -220,8 +228,17 @@ def main(infile):
                                               """, 'XTFPINGCHANHEADER',
                                               dict_factory=OrderedDict)
                 assert cheader_len == 64
-                if i % 100 == 0:
-                    pprint(cheader.items())
+                #if i % 99 == 0:
+                #    pprint(cheader.items())
+
+                dstart = (pstart + pheader_len + sheader_len +
+                          cheader_len * pheader['num_chans_to_follow'])
+
+                n = cheader['num_samples']
+                s = chaninfo['bytes_per_sample']
+                trace = np.frombuffer(file_data[dstart:dstart+s*n].tobytes(),
+                                      {1: np.int8, 2: np.int16}[s])
+                yield cheader['channel_number'], trace
 
         elif header_type == 'NOTES':
             nheader_len, nheader = unwrap(file_data[pstart + pheader_len:],
@@ -242,6 +259,8 @@ def main(infile):
 
         pstart += pheader['num_bytes_this_record']
         i += 1
+
+    sys.stdout.write('\n')
 
 class BadDataError(Exception):
     pass
@@ -298,6 +317,30 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
                     [adj, data_name, name, '== %r' % v] if w))
 
     return length, dict_factory(zip(names, values))
-               
+
+def main(infile):
+    channel_trace = sorted(readxtf(infile),key=lambda (c, t): c)
+
+    channels = {}
+    for c, t in channel_trace:
+        channels.setdefault(c, 0)
+        channels[c] += 1
+
+    import pylab as P
+    P.suptitle('File: ' + infile)
+    first = None
+    for i, (channel, traces) in enumerate(groupby(channel_trace,
+                                                  lambda (c, t): c)):
+        traces = list(t for c, t in traces)
+        r = np.vstack(traces).transpose()
+        print 'Plotting channel %d %s:' % (channel, r.shape)
+        print r
+
+        ax = P.subplot(len(channels), 1, i+1, sharex=first, sharey=first)
+        if i == 0: first = ax
+        P.title('Channel %d' % channel)
+        P.imshow(r, P.cm.gray)
+    P.show()
+
 if __name__ == '__main__':
     main(*sys.argv[1:])
