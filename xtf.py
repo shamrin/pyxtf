@@ -1,3 +1,9 @@
+"""xtf.py - read and show eXtended Triton Format (XTF) files
+
+Usage:
+    python xtf.py <path-to-xtf-file>
+"""
+
 import sys
 import re
 import struct
@@ -343,4 +349,6 @@ def main(infile):
     P.show()
 
 if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        sys.exit('Error: wrong arguments\n' + __doc__.rstrip())
     main(*sys.argv[1:])
