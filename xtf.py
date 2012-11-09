@@ -109,8 +109,120 @@ def main(infile):
         header_type = HEADER_TYPES.get(pheader['header_type'], 
                                        'UNKNOWN (%d)' % pheader['header_type'])
         if header_type == 'SONAR':
-            pass
-            #print '% 5d' % i, header_type
+            sheader_len, sheader = unwrap(file_data[pstart + pheader_len:],
+                                          """H year
+                                             B month
+                                             B day
+                                             B hour
+                                             B minute
+                                             B second
+                                             B hseconds
+                                             H julian_day
+                                             I event_number
+                                             I ping_number
+                                             f sound_velocity
+                                             f ocean_tide
+                                             I reserved2
+                                             f conductiviy_freq
+                                             f temperature_freq
+                                             f pressure_freq
+                                             f pressure_temp
+                                             f conductivity
+                                             f water_temperature
+                                             f pressure
+                                             f computed_sound_velocity
+                                             f mag_x
+                                             f mag_y
+                                             f mag_z
+                                             f aux_val1
+                                             f aux_val2
+                                             f aux_val3
+                                             f aux_val4
+                                             f aux_val5
+                                             f aux_val6
+                                             f speed_log
+                                             f turbidity
+                                             f ship_speed
+                                             f ship_gyro
+                                             d ship_ycoordinate
+                                             d ship_xcoordinate
+                                             H ship_alititude
+                                             H ship_depth
+                                             B fix_time_hour
+                                             B fix_time_minute
+                                             B fix_time_second
+                                             B fix_time_hsecond
+                                             f sensor_speed
+                                             f KP
+                                             d sensor_ycoordinate
+                                             d sensor_xcoordinate
+                                             H sonar_status
+                                             H range_to_fish
+                                             H bearing_to_fish
+                                             H cable_out
+                                             f layback
+                                             f cable_tension
+                                             f sensor_depth
+                                             f sensor_primary_altitude
+                                             f sensor_aux_altitude
+                                             f sensor_pitch
+                                             f sensor_roll
+                                             f sensor_heading
+                                             f heave
+                                             f yaw
+                                             I attitude_time_lag
+                                             f DOT
+                                             I nav_fix_milliseconds
+                                             B computer_clock_hour
+                                             B computer_clock_minute
+                                             B computer_clock_second
+                                             B computer_clock_hsec
+                                             h fish_position_delta_x
+                                             h fish_position_delta_y
+                                             B fish_position_error_code
+                                             11s reserved3
+                                          """, 'XTFPINGHEADER',
+                                          dict_factory=OrderedDict)
+            assert pheader_len + sheader_len == 256
+            if i % 100 == 0:
+                print '% 5d' % i, header_type
+                pprint(pheader.items())
+                pprint(sheader.items())
+
+            assert pheader['num_chans_to_follow'] <= 6
+            for j in range(pheader['num_chans_to_follow']):
+                cheader_len, cheader = unwrap(file_data[pstart + pheader_len +
+                                                        sheader_len:],
+                                              """H channel_number
+                                                 H downsample_method
+                                                 f slant_range
+                                                 f ground_range
+                                                 f time_delay
+                                                 f time_duration
+                                                 f seconds_per_ping
+                                                 H processing_flags
+                                                 H frequency
+                                                 H initial_gain_code
+                                                 H gain_code
+                                                 H band_width
+                                                 I contact_number
+                                                 H contact_classification
+                                                 B conact_sub_number
+                                                 b contact_type
+                                                 I num_samples
+                                                 H millivolt_scale
+                                                 f contact_time_of_track
+                                                 B contact_close_number
+                                                 B reserved2
+                                                 f fixed_VSOP
+                                                 h weight
+                                                 4s reserved
+                                              """, 'XTFPINGCHANHEADER',
+                                              dict_factory=OrderedDict)
+                assert cheader_len == 64
+                if i % 100 == 0:
+                    pprint(cheader.items())
+
         elif header_type == 'NOTES':
             nheader_len, nheader = unwrap(file_data[pstart + pheader_len:],
                                           """H year
@@ -122,7 +234,7 @@ def main(infile):
                                              35s reserved
                                              200s notes_text
                                           """, dict_factory=OrderedDict)
-            print '% 5d' % i, header_type, repr(nheader['notes_text'])
+            #print '% 5d' % i, header_type, repr(nheader['notes_text'])
             #pprint(pheader.items()); pprint(nheader.items())
             assert nheader_len + pheader_len == pheader['num_bytes_this_record']
         else:
