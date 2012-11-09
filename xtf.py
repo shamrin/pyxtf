@@ -4,62 +4,6 @@ import struct
 from pprint import pprint, pformat
 from collections import OrderedDict
 
-class BadDataError(Exception):
-    pass
-
-def unwrap(binary, spec, data_name=None, dict_factory=dict):
-    """Unwrap `binary` according to `spec`, return (consumed_length, data)
-
-    Basically it's a convenient wrapper around struct.unpack. Each non-empty
-    line in spec must be: <struct format> <field name> [<test> <action>]
-
-    struct format - struct module format producing exactly one value
-    field name - dictionary key to put unpacked value into
-    test - optional test (unpacked) value should pass
-    action - what to do if test failed: `!` (bad data) or `?` (unsupported)
-
-    Example:
-    >>> unwrap('\x0a\x00DATA\x00something else', '''h magic == 0x0a !
-    ...                                             4s data''')
-    (6, {'magic': 10, 'data': 'DATA'})
-    """
-
-    matches = [re.match("""(\w+)           # struct format
-                           \s+
-                           (\w+)           # field name
-                           ((.+)\ ([!?]))? # optional test-action pair
-                           $""", s.strip(), re.VERBOSE)
-               for s in spec.split('\n') if s and not s.isspace()]
-
-    for n, m in enumerate(matches):
-        if not m: raise SyntaxError('Bad unwrap spec, LINE %d' % (n+1))
-
-    formats = [m.group(1) for m in matches]
-    names = [m.group(2) for m in matches]
-    tests = [(m.group(4), m.group(5)) for m in matches]
-
-    # unpack binary data
-    fmt = '<' + ''.join(formats)
-    length = struct.calcsize(fmt)
-    sub = binary[:length]
-    if isinstance(sub, memoryview):
-        sub = sub.tobytes()
-    values = list(struct.unpack(fmt, sub))
-
-    # rstrip null bytes and '\r' from strings
-    for i, c in enumerate(formats):
-        if re.match(r'(\d+)s', c):
-            values[i] = values[i].rstrip('\x00\r')
-
-    # run optional tests
-    for v, name, (test, action) in zip(values, names, tests):
-        if test and not eval(name + test, {name: v}, globals()):
-            adj = {'!': 'Bad', '?': 'Unsupported'}[action]
-            raise BadDataError(' '.join(w for w in
-                    [adj, data_name, name, '== %r' % v] if w))
-
-    return length, dict_factory(zip(names, values))
-
 CHAN_TYPES = {
     0: 'SUBBOTTOM',
     1: 'PORT',
@@ -187,7 +131,61 @@ def main(infile):
         pstart += pheader['num_bytes_this_record']
         i += 1
 
+class BadDataError(Exception):
+    pass
 
+def unwrap(binary, spec, data_name=None, dict_factory=dict):
+    """Unwrap `binary` according to `spec`, return (consumed_length, data)
+
+    Basically it's a convenient wrapper around struct.unpack. Each non-empty
+    line in spec must be: <struct format> <field name> [<test> <action>]
+
+    struct format - struct module format producing exactly one value
+    field name - dictionary key to put unpacked value into
+    test - optional test (unpacked) value should pass
+    action - what to do if test failed: `!` (bad data) or `?` (unsupported)
+
+    Example:
+    >>> unwrap('\x0a\x00DATA\x00something else', '''h magic == 0x0a !
+    ...                                             4s data''')
+    (6, {'magic': 10, 'data': 'DATA'})
+    """
+
+    matches = [re.match("""(\w+)           # struct format
+                           \s+
+                           (\w+)           # field name
+                           ((.+)\ ([!?]))? # optional test-action pair
+                           $""", s.strip(), re.VERBOSE)
+               for s in spec.split('\n') if s and not s.isspace()]
+
+    for n, m in enumerate(matches):
+        if not m: raise SyntaxError('Bad unwrap spec, LINE %d' % (n+1))
+
+    formats = [m.group(1) for m in matches]
+    names = [m.group(2) for m in matches]
+    tests = [(m.group(4), m.group(5)) for m in matches]
+
+    # unpack binary data
+    fmt = '<' + ''.join(formats)
+    length = struct.calcsize(fmt)
+    sub = binary[:length]
+    if isinstance(sub, memoryview):
+        sub = sub.tobytes()
+    values = list(struct.unpack(fmt, sub))
+
+    # rstrip null bytes and '\r' from strings
+    for i, c in enumerate(formats):
+        if re.match(r'(\d+)s', c):
+            values[i] = values[i].rstrip('\x00\r')
+
+    # run optional tests
+    for v, name, (test, action) in zip(values, names, tests):
+        if test and not eval(name + test, {name: v}, globals()):
+            adj = {'!': 'Bad', '?': 'Unsupported'}[action]
+            raise BadDataError(' '.join(w for w in
+                    [adj, data_name, name, '== %r' % v] if w))
+
+    return length, dict_factory(zip(names, values))
                
 if __name__ == '__main__':
     main(*sys.argv[1:])
