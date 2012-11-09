@@ -41,7 +41,10 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
     # unpack binary data
     fmt = '<' + ''.join(formats)
     length = struct.calcsize(fmt)
-    values = list(struct.unpack(fmt, binary[:length]))
+    sub = binary[:length]
+    if isinstance(sub, memoryview):
+        sub = sub.tobytes()
+    values = list(struct.unpack(fmt, sub))
 
     for i, c in enumerate(formats):
         if re.match(r'(\d+)s', c):
@@ -77,7 +80,7 @@ HEADER_TYPES = {
 HEADER_LEN = 1024
 
 def main(infile):
-    file_data = open(infile, 'rb').read()
+    file_data = memoryview(open(infile, 'rb').read())
     header_len, header = unwrap(file_data,
                                 """B file_format == 0x7b !
                                    B system_type
@@ -148,7 +151,7 @@ def main(infile):
 
     i = 0
     pstart = HEADER_LEN
-    while pstart < len(file_data):
+    while file_data[pstart:]:
         pheader_len, pheader = unwrap(file_data[pstart:],
                                       """H magic_number == 0xFACE !
                                          B header_type
