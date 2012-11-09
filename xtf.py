@@ -326,7 +326,7 @@ def main(infile):
         channels.setdefault(c, 0)
         channels[c] += 1
 
-    import pylab as P
+    from matplotlib import pyplot as P
     P.suptitle('File: ' + infile)
     first = None
     for i, (channel, traces) in enumerate(groupby(channel_trace,
