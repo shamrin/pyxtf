@@ -46,6 +46,7 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
         sub = sub.tobytes()
     values = list(struct.unpack(fmt, sub))
 
+    # rstrip null bytes and '\r' from strings
     for i, c in enumerate(formats):
         if re.match(r'(\d+)s', c):
             values[i] = values[i].rstrip('\x00\r')
@@ -116,7 +117,7 @@ def main(infile):
                                    f MRU_offset_pitch
                                    f MRU_offset_roll
                                 """, dict_factory=OrderedDict)
-    pprint(header.items())
+    #pprint(header.items())
     nchannels = (header['number_of_sonar_channels'] +
                  header['number_of_bathimetry_channels'])
     assert nchannels <= 6
@@ -164,8 +165,8 @@ def main(infile):
         header_type = HEADER_TYPES.get(pheader['header_type'], 
                                        'UNKNOWN (%d)' % pheader['header_type'])
         if header_type == 'SONAR':
-            if i % 50 == 0:
-                print '% 5d' % i, header_type, len(file_data[pstart:])
+            pass
+            #print '% 5d' % i, header_type
         elif header_type == 'NOTES':
             nheader_len, nheader = unwrap(file_data[pstart + pheader_len:],
                                           """H year
@@ -177,8 +178,7 @@ def main(infile):
                                              35s reserved
                                              200s notes_text
                                           """, dict_factory=OrderedDict)
-            print '% 5d' % i, header_type, repr(nheader['notes_text']), \
-                                           len(file_data[pstart:])
+            print '% 5d' % i, header_type, repr(nheader['notes_text'])
             #pprint(pheader.items()); pprint(nheader.items())
             assert nheader_len + pheader_len == pheader['num_bytes_this_record']
         else:
