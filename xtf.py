@@ -99,7 +99,7 @@ def readxtf(infile):
                                              54s reserved2
                                           """, dict_factory=OrderedDict)
         assert chaninfo_len == CHAN_INFO_LEN
-        print '  ', i, chaninfo['sub_channel_number'], \
+        print '  ', i+1, chaninfo['sub_channel_number'], \
               CHAN_TYPES[chaninfo['type_of_channel']], \
               chaninfo['channel_name']
         #pprint(chaninfo.items())
@@ -332,20 +332,34 @@ def main(infile):
         channels.setdefault(c, 0)
         channels[c] += 1
 
-    from matplotlib import pyplot as P
+    def clicked(name):
+        def callback(*args):
+            print 'clicked(%s): %s' % (name, args)
+        return callback
+
+    from matplotlib import pyplot as P, widgets
     P.suptitle('File: ' + infile)
+
+    buttons = []
+
     first = None
     for i, (channel, traces) in enumerate(groupby(channel_trace,
                                                   lambda (c, t): c)):
         traces = list(t for c, t in traces)
         r = np.vstack(traces).transpose()
-        print 'Plotting channel %d %s:' % (channel, r.shape)
+        print 'Plotting channel %d %s:' % (channel+1, r.shape)
         print r
 
-        ax = P.subplot(len(channels), 1, i+1, sharex=first, sharey=first)
-        if i == 0: first = ax
-        P.title('Channel %d' % channel)
+        ax = P.subplot(len(channels), 2, i*2+1, sharex=first, sharey=first)
+        if i == 0:
+            first = ax
+        P.title('Channel %d' % (channel+1))
         P.imshow(r, P.cm.gray)
+
+        bax = P.subplot(len(channels), 2, i*2+2)
+        buttons.append(widgets.CheckButtons(bax, ['select channel'], [False]))
+        buttons[-1].on_clicked(clicked(channel+1))
+
     P.show()
 
 if __name__ == '__main__':
