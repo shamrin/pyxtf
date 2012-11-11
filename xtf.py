@@ -33,7 +33,7 @@ HEADER_TYPES = {
 }
 HEADER_LEN = 1024
 
-def readxtf(infile):
+def read_XTF(infile):
     file_data = memoryview(open(infile, 'rb').read())
     header_len, header = unwrap(file_data,
                                 """B file_format == 0x7b !
@@ -75,6 +75,7 @@ def readxtf(infile):
                  header['number_of_bathimetry_channels'])
     assert nchannels <= 6
     print 'Channels:'
+    chaninfos = []
     for i in range(nchannels):
         chaninfo_len, chaninfo = unwrap(file_data[header_len+i*CHAN_INFO_LEN:],
                                           """B type_of_channel
@@ -103,14 +104,18 @@ def readxtf(infile):
               CHAN_TYPES[chaninfo['type_of_channel']], \
               chaninfo['channel_name']
         #pprint(chaninfo.items())
+        chaninfos.append(chaninfo)
 
-    i = 0
     pstart = HEADER_LEN
-    while file_data[pstart:]:
+    return chaninfos, traces_gen(file_data[pstart:], chaninfos)
+
+def traces_gen(data, chaninfos):
+    i = 0
+    while data:
         sys.stdout.write('\rtrace % 4d' % i)
         sys.stdout.flush()
 
-        pheader_len, pheader = unwrap(file_data[pstart:],
+        pheader_len, pheader = unwrap(data,
                                       """H magic_number == 0xFACE !
                                          B header_type
                                          B sub_channel_number
@@ -122,7 +127,7 @@ def readxtf(infile):
         header_type = HEADER_TYPES.get(pheader['header_type'], 
                                        'UNKNOWN (%d)' % pheader['header_type'])
         if header_type == 'SONAR':
-            sheader_len, sheader = unwrap(file_data[pstart + pheader_len:],
+            sheader_len, sheader = unwrap(data[pheader_len:],
                                           """H year
                                              B month
                                              B day
@@ -204,9 +209,9 @@ def readxtf(infile):
             #    pprint(sheader.items())
 
             assert pheader['num_chans_to_follow'] <= 6
+            assert pheader['num_chans_to_follow'] == 1, 'Not implemented'
             for channel in range(pheader['num_chans_to_follow']):
-                cheader_len, cheader = unwrap(file_data[pstart + pheader_len +
-                                                        sheader_len:],
+                cheader_len, cheader = unwrap(data[pheader_len + sheader_len:],
                                               """H channel_number
                                                  H downsample_method
                                                  f slant_range
@@ -237,17 +242,17 @@ def readxtf(infile):
                 #if i % 99 == 0:
                 #    pprint(cheader.items())
 
-                dstart = (pstart + pheader_len + sheader_len +
+                dstart = (pheader_len + sheader_len +
                           cheader_len * pheader['num_chans_to_follow'])
 
                 n = cheader['num_samples']
-                s = chaninfo['bytes_per_sample']
-                trace = np.frombuffer(file_data[dstart:dstart+s*n].tobytes(),
+                s = chaninfos[cheader['channel_number']]['bytes_per_sample']
+                trace = np.frombuffer(data[dstart:dstart+s*n].tobytes(),
                                       {1: np.int8, 2: np.int16}[s])
                 yield cheader['channel_number'], trace
 
         elif header_type == 'NOTES':
-            nheader_len, nheader = unwrap(file_data[pstart + pheader_len:],
+            nheader_len, nheader = unwrap(data[pheader_len:],
                                           """H year
                                              B month
                                              B day
@@ -263,7 +268,7 @@ def readxtf(infile):
         else:
             print '% 5d' % i, header_type 
 
-        pstart += pheader['num_bytes_this_record']
+        data = data[pheader['num_bytes_this_record']:]
         i += 1
 
     sys.stdout.write('\n')
@@ -325,17 +330,17 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
     return length, dict_factory(zip(names, values))
 
 def main(infile):
-    channel_trace = sorted(readxtf(infile),key=lambda (c, t): c)
+    chaninfos, channel_trace = read_XTF(infile)
+    channel_trace = sorted(channel_trace, key=lambda (c, t): c)
 
-    channels = {}
+    channels = [0] * len(chaninfos)
     for c, t in channel_trace:
-        channels.setdefault(c, 0)
         channels[c] += 1
 
-    def clicked(name):
-        def callback(*args):
-            print 'clicked(%s): %s' % (name, args)
-        return callback
+    n_nonempty = len([c for c in channels if c])
+
+    def clicked(*args):
+        print 'clicked', args
 
     from matplotlib import pyplot as P, widgets
     P.suptitle('File: ' + infile)
@@ -350,15 +355,26 @@ def main(infile):
         print 'Plotting channel %d %s:' % (channel+1, r.shape)
         print r
 
-        ax = P.subplot(len(channels), 2, i*2+1, sharex=first, sharey=first)
+        ax = P.subplot(n_nonempty, 2, i*2+1, sharex=first, sharey=first)
         if i == 0:
             first = ax
         P.title('Channel %d' % (channel+1))
         P.imshow(r, P.cm.gray)
 
-        bax = P.subplot(len(channels), 2, i*2+2)
-        buttons.append(widgets.CheckButtons(bax, ['select channel'], [False]))
-        buttons[-1].on_clicked(clicked(channel+1))
+    cbax = P.subplot(2, 2, 2)
+    P.title('Choose channels:')
+    w = widgets.CheckButtons(cbax, ['channel %d, traces: %d' % (c+1, t)
+                                    for c, t in enumerate(channels)],
+                                   [t > 0 for t in channels])
+    w.on_clicked(clicked)
+
+    bax1 = P.subplot(4, 2, 6)
+    b1 = widgets.Button(bax1, 'Save to SEG-Y')
+    b1.on_clicked(clicked)
+
+    bax2 = P.subplot(4, 2, 8)
+    b2 = widgets.Button(bax2, 'Save to XTF')
+    b2.on_clicked(clicked)
 
     P.show()
 
