@@ -113,7 +113,7 @@ def read_XTF(infile):
 def traces_gen(data, chaninfos):
     i = 0
     while data:
-        sys.stdout.write('\rtrace % 4d' % i)
+        sys.stdout.write('\rPacket: %d' % i)
         sys.stdout.flush()
 
         pheader_len, pheader = unwrap(data,
