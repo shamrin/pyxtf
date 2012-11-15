@@ -277,6 +277,7 @@ def traces_gen(data, chaninfos):
 class BadDataError(Exception):
     pass
 
+_unwrap_cache = {}
 def unwrap(binary, spec, data_name=None, dict_factory=dict):
     """Unwrap `binary` according to `spec`, return (consumed_length, data)
 
@@ -294,19 +295,23 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
     (6, {'magic': 10, 'data': 'DATA'})
     """
 
-    matches = [re.match("""(\w+)           # struct format
-                           \s+
-                           (\w+)           # field name
-                           ((.+)\ ([!?]))? # optional test-action pair
-                           $""", s.strip(), re.VERBOSE)
-               for s in spec.split('\n') if s and not s.isspace()]
+    if spec in _unwrap_cache:
+        formats, names, tests = _unwrap_cache[spec]
+    else:
+        matches = [re.match("""(\w+)           # struct format
+                               \s+
+                               (\w+)           # field name
+                               ((.+)\ ([!?]))? # optional test-action pair
+                               $""", s.strip(), re.VERBOSE)
+                   for s in spec.split('\n') if s and not s.isspace()]
 
-    for n, m in enumerate(matches):
-        if not m: raise SyntaxError('Bad unwrap spec, LINE %d' % (n+1))
+        for n, m in enumerate(matches):
+            if not m: raise SyntaxError('Bad unwrap spec, LINE %d' % (n+1))
 
-    formats = [m.group(1) for m in matches]
-    names = [m.group(2) for m in matches]
-    tests = [(m.group(4), m.group(5)) for m in matches]
+        formats = [m.group(1) for m in matches]
+        names = [m.group(2) for m in matches]
+        tests = [(m.group(4), m.group(5)) for m in matches]
+        _unwrap_cache[spec] = formats, names, tests
 
     # unpack binary data
     fmt = '<' + ''.join(formats)
