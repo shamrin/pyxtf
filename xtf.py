@@ -280,11 +280,11 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
     """Unwrap `binary` according to `spec`, return (consumed_length, data)
 
     Basically it's a convenient wrapper around struct.unpack. Each non-empty
-    line in spec must be: <struct format> <field name> [<test> <action>]
+    line in spec must be: <struct format> <field name> [== <test> <action>]
 
     struct format - struct module format producing exactly one value
     field name - dictionary key to put unpacked value into
-    test - optional test (unpacked) value should pass
+    test - optional test an unpacked value be equal to
     action - what to do if test failed: `!` (bad data) or `?` (unsupported)
 
     Example:
@@ -299,7 +299,8 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
         matches = [re.match("""(\w+)           # struct format
                                \s+
                                (\w+)           # field name
-                               ((.+)\ ([!?]))? # optional test-action pair
+                               \s*
+                               (==\s*(.+)\ ([!?]))? # optional test-action
                                $""", s.strip(), re.VERBOSE)
                    for s in spec.split('\n') if s and not s.isspace()]
 
@@ -308,9 +309,14 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
 
         formats = [m.group(1) for m in matches]
         names = [m.group(2) for m in matches]
+
         tests = [(m.group(4), m.group(5)) for m in matches]
+        tests = [(i, eval(test, {}, globals()), action)
+                 for i, (test, action) in enumerate(tests) if test]
+
         s_indices = [i for i, c in enumerate(formats)
                        if re.match(r'(\d+)s', c)]
+
         _unwrap_cache[spec] = formats, names, tests, s_indices
 
     # unpack binary data
@@ -326,8 +332,8 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
         values[i] = values[i].rstrip('\x00\r')
 
     # run optional tests
-    for v, name, (test, action) in zip(values, names, tests):
-        if test and not eval(name + test, {name: v}, globals()):
+    for i, test, action in tests:
+        if values[i] != test:
             adj = {'!': 'Bad', '?': 'Unsupported'}[action]
             raise BadDataError(' '.join(w for w in
                     [adj, data_name, name, '== %r' % v] if w))
