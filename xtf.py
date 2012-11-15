@@ -98,7 +98,7 @@ def read_XTF(infile):
                                              f offset_roll
                                              H beams_per_array
                                              54s reserved2
-                                          """, dict_factory=OrderedDict)
+                                          """)
         assert chaninfo_len == CHAN_INFO_LEN
         print '  %d %d %s "%s"' % (i+1,
                                    chaninfo['sub_channel_number'],
@@ -123,7 +123,7 @@ def traces_gen(data, chaninfos):
                                          H num_chans_to_follow
                                          4s reserved1
                                          I num_bytes_this_record
-                                      """, dict_factory=OrderedDict)
+                                      """)
         #pprint(pheader.items())
         header_type = HEADER_TYPES.get(pheader['header_type'], 
                                        'UNKNOWN (%d)' % pheader['header_type'])
@@ -200,8 +200,7 @@ def traces_gen(data, chaninfos):
                                              h fish_position_delta_y
                                              B fish_position_error_code
                                              11s reserved3
-                                          """, 'XTFPINGHEADER',
-                                          dict_factory=OrderedDict)
+                                          """, 'XTFPINGHEADER')
             assert pheader_len + sheader_len == 256
 
             #if i % 99 == 0:
@@ -237,8 +236,7 @@ def traces_gen(data, chaninfos):
                                                  f fixed_VSOP
                                                  h weight
                                                  4s reserved
-                                              """, 'XTFPINGCHANHEADER',
-                                              dict_factory=OrderedDict)
+                                              """, 'XTFPINGCHANHEADER')
                 assert cheader_len == 64
                 #if i % 99 == 0:
                 #    pprint(cheader.items())
@@ -262,7 +260,7 @@ def traces_gen(data, chaninfos):
                                              B second
                                              35s reserved
                                              200s notes_text
-                                          """, dict_factory=OrderedDict)
+                                          """)
             #print '% 5d' % i, header_type, repr(nheader['notes_text'])
             #pprint(pheader.items()); pprint(nheader.items())
             assert nheader_len + pheader_len == pheader['num_bytes_this_record']
