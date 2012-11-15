@@ -294,7 +294,7 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
     """
 
     if spec in _unwrap_cache:
-        formats, names, tests, s_indices = _unwrap_cache[spec]
+        formats, names, tests, s_indices, _n = _unwrap_cache[spec]
     else:
         matches = [re.match("""(\w+)           # struct format
                                \s+
@@ -317,19 +317,28 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
         s_indices = [i for i, c in enumerate(formats)
                        if re.match(r'(\d+)s', c)]
 
-        _unwrap_cache[spec] = formats, names, tests, s_indices
+        def ntype(f):
+            m = re.match(r'(\d+)s', f)
+            if m: return 'S' + m.group(1)
 
-    # unpack binary data
-    fmt = '<' + ''.join(formats)
-    length = struct.calcsize(fmt)
+            return {
+                'B': '<u1', 'b': '<i1',
+                'H': '<u2', 'h': '<i2',
+                'I': '<u4', 'i': '<i4',
+                'f': '<f4', 'd': '<f8',
+                'l': '<i4',
+            }[f]
+
+        _n = np.dtype([(n, ntype(f)) for n, f in zip(names, formats)])
+
+        _unwrap_cache[spec] = formats, names, tests, s_indices, _n
+
+    # unpack with numpy
+    length = _n.itemsize
     sub = binary[:length]
     if isinstance(sub, memoryview):
         sub = sub.tobytes()
-    values = list(struct.unpack(fmt, sub))
-
-    # rstrip null bytes and '\r' from strings
-    for i in s_indices:
-        values[i] = values[i].rstrip('\x00\r')
+    values = np.frombuffer(sub, _n, 1)[0]
 
     # run optional tests
     for i, test, action in tests:
