@@ -294,7 +294,7 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
     """
 
     if spec in _unwrap_cache:
-        formats, names, tests = _unwrap_cache[spec]
+        formats, names, tests, s_indices = _unwrap_cache[spec]
     else:
         matches = [re.match("""(\w+)           # struct format
                                \s+
@@ -309,7 +309,9 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
         formats = [m.group(1) for m in matches]
         names = [m.group(2) for m in matches]
         tests = [(m.group(4), m.group(5)) for m in matches]
-        _unwrap_cache[spec] = formats, names, tests
+        s_indices = [i for i, c in enumerate(formats)
+                       if re.match(r'(\d+)s', c)]
+        _unwrap_cache[spec] = formats, names, tests, s_indices
 
     # unpack binary data
     fmt = '<' + ''.join(formats)
@@ -320,9 +322,8 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
     values = list(struct.unpack(fmt, sub))
 
     # rstrip null bytes and '\r' from strings
-    for i, c in enumerate(formats):
-        if re.match(r'(\d+)s', c):
-            values[i] = values[i].rstrip('\x00\r')
+    for i in s_indices:
+        values[i] = values[i].rstrip('\x00\r')
 
     # run optional tests
     for v, name, (test, action) in zip(values, names, tests):
