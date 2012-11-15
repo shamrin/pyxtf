@@ -14,10 +14,10 @@ from itertools import groupby
 import numpy as np
 
 CHAN_TYPES = {
-    0: 'SUBBOTTOM',
-    1: 'PORT',
-    2: 'STBD',
-    3: 'BATHYMETRY',
+    0: 'subbottom',
+    1: 'port',
+    2: 'stbd',
+    3: 'bathymetry',
 }
 CHAN_INFO_LEN = 128
 HEADER_TYPES = {
@@ -100,9 +100,10 @@ def read_XTF(infile):
                                              54s reserved2
                                           """, dict_factory=OrderedDict)
         assert chaninfo_len == CHAN_INFO_LEN
-        print '  ', i+1, chaninfo['sub_channel_number'], \
-              CHAN_TYPES[chaninfo['type_of_channel']], \
-              chaninfo['channel_name']
+        print '  %d %d %s "%s"' % (i+1,
+                                   chaninfo['sub_channel_number'],
+                                   CHAN_TYPES[chaninfo['type_of_channel']],
+                                   chaninfo['channel_name'])
         #pprint(chaninfo.items())
         chaninfos.append(chaninfo)
 
@@ -342,12 +343,14 @@ def main(infile):
     def clicked(*args):
         print 'clicked', args
 
+    #import matplotlib; matplotlib.use('MacOSX')
     from matplotlib import pyplot as P, widgets
     P.suptitle('File: ' + infile)
+    P.gcf().canvas.set_window_title("%s - xtf.py" % infile)
 
     buttons = []
 
-    first = None
+    #first = None
     for i, (channel, traces) in enumerate(groupby(channel_trace,
                                                   lambda (c, t): c)):
         traces = list(t for c, t in traces)
@@ -355,26 +358,38 @@ def main(infile):
         print 'Plotting channel %d %s:' % (channel+1, r.shape)
         print r
 
-        ax = P.subplot(n_nonempty, 2, i*2+1, sharex=first, sharey=first)
-        if i == 0:
-            first = ax
+        ax = P.subplot(n_nonempty, 2, i*2+1) #, sharex=first, sharey=first)
+        #if i == 0: first = ax
+
+        ax.set_xlim(0, 500)
+        ax.set_ylim(500, 0)
+
         P.title('Channel %d' % (channel+1))
         P.imshow(r, P.cm.gray)
 
     cbax = P.subplot(2, 2, 2)
     P.title('Choose channels:')
-    w = widgets.CheckButtons(cbax, ['channel %d, traces: %d' % (c+1, t)
+    w = widgets.CheckButtons(cbax, ['ch.%d, %s, traces: %d' %
+                                    (c+1, CHAN_TYPES[chaninfos[c]['type_of_channel']], t)
                                     for c, t in enumerate(channels)],
                                    [t > 0 for t in channels])
     w.on_clicked(clicked)
 
-    bax1 = P.subplot(4, 2, 6)
-    b1 = widgets.Button(bax1, 'Save to SEG-Y')
+    bax1 = P.subplot(6, 4, 15)
+    b1 = widgets.Button(bax1, '<< Prev file')
     b1.on_clicked(clicked)
 
-    bax2 = P.subplot(4, 2, 8)
-    b2 = widgets.Button(bax2, 'Save to XTF')
+    bax2 = P.subplot(6, 4, 16)
+    b2 = widgets.Button(bax2, 'Next file >>')
     b2.on_clicked(clicked)
+
+    bax3 = P.subplot(6, 2, 10)
+    b3 = widgets.Button(bax3, 'Save all files to SEG-Y')
+    b3.on_clicked(clicked)
+
+    bax4 = P.subplot(6, 2, 12)
+    b4 = widgets.Button(bax4, 'Save all files to XTF')
+    b4.on_clicked(clicked)
 
     P.show()
 
