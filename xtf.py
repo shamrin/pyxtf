@@ -9,7 +9,7 @@ import re
 import struct
 from pprint import pprint, pformat
 from collections import OrderedDict
-from itertools import groupby
+from itertools import groupby, islice
 
 import numpy as np
 
@@ -340,6 +340,8 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
 
     return length, dict_factory(zip(names, values))
 
+PLOT_NTRACES = 3000
+
 def main(infile):
     chaninfos, channel_trace = read_XTF(infile)
     channel_trace = sorted(channel_trace, key=lambda (c, t): c)
@@ -363,9 +365,12 @@ def main(infile):
     #first = None
     for i, (channel, traces) in enumerate(groupby(channel_trace,
                                                   lambda (c, t): c)):
-        traces = list(t for c, t in traces)
+        traces = list(t for c, t in islice(traces, PLOT_NTRACES))
         r = np.vstack(traces).transpose()
-        print 'Plotting channel %d %s:' % (channel+1, r.shape)
+        print 'Plotting %d traces of channel %d (%.1fMb):' % \
+            (min(channels[i], PLOT_NTRACES),
+             channel + 1,
+             (r.size * r.itemsize) / 10.0**6)
         print r
 
         ax = P.subplot(n_nonempty, 2, i*2+1) #, sharex=first, sharey=first)
@@ -374,7 +379,8 @@ def main(infile):
         ax.set_xlim(0, 500)
         ax.set_ylim(500, 0)
 
-        P.title('Channel %d' % (channel+1))
+        P.title('Channel %d%s' %
+                (channel + 1, ' (part)' if PLOT_NTRACES < channels[i] else ''))
         P.imshow(r, P.cm.gray)
 
     cbax = P.subplot(2, 2, 2)
