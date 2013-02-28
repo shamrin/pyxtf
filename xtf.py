@@ -342,7 +342,7 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
 
 PLOT_NTRACES = 3000
 
-def read_XTF_as_numpy_images(infile):
+def read_XTF_as_grayscale_arrays(infile):
     chaninfos, channel_trace = read_XTF(infile)
     channel_trace = sorted(channel_trace, key=lambda (c, t): c)
 

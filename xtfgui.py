@@ -1,5 +1,3 @@
-import json
-
 import numpy
 from GUI import Application, ScrollableView, Document, Window, Cursor, rgb, Image, Frame, Font, Model
 from GUI.Files import FileType
@@ -39,9 +37,9 @@ def normalize(a):
     a *= 255.0 / (hi - lo)
     return a.round()
 
-def arrays(xtf_file):
+def rgb_arrays(xtf_file):
     import xtf
-    for a in xtf.read_XTF_as_numpy_images(xtf_file):
+    for a in xtf.read_XTF_as_grayscale_arrays(xtf_file):
         a = normalize(a)
 
         # make grayscale RGB image: [x, y, ...] => [[x, x, x], [y, y, y], ...]
@@ -50,14 +48,49 @@ def arrays(xtf_file):
 
         yield g
 
+def image_from_rgb_array(array):
+    # based on image_from_ndarray and (buggy) GDIPlus.Bitmap.from_data
+
+    from GUI import GDIPlus as gdi
+    from ctypes import c_void_p, byref
+
+    height, width, bytes_per_pixel = array.shape
+    assert bytes_per_pixel == 3
+    assert array.dtype == numpy.uint8
+    format = gdi.PixelFormat24bppRGB
+
+    # make sure that image width is divisable by 4
+    pad = -width % 4
+    stride = (width + pad) * bytes_per_pixel
+    if pad:
+        p = numpy.empty((height, pad, bytes_per_pixel), dtype = numpy.uint8)
+        array = numpy.hstack((array, p))
+
+    # create and fill GDI+ bitmap
+    bitmap = gdi.Bitmap.__new__(gdi.Bitmap)
+    ptr = c_void_p()
+    data = array.tostring() # FIXME works only for gray images...
+    if gdi.wg.GdipCreateBitmapFromScan0(width, height, stride, format, data,
+                                        byref(ptr)) != 0:
+        raise Exception('GDI+ Error')
+    bitmap.ptr = ptr
+
+    # create Image object
+    image = Image.__new__(Image)
+    image._win_image = bitmap
+    image._data = data # is it really needed? (image_from_ndarray does it too)
+
+    return image
+
+
 class FileView(Frame):
     def __init__(self, document):
         Frame.__init__(self)
 
         self.document = document
 
-        for i, channel in enumerate(image_from_ndarray(a, 'RGB')
-                                    for a in arrays(self.document.files[0])):
+        for i, channel in enumerate(image_from_rgb_array(a)
+                                    for a in rgb_arrays(self.document.files[0])):
             view = ChannelView(model = Channel(channel, i+1), scrolling = 'h')
             self.place(view)
 
@@ -107,7 +140,6 @@ class Project(Document):
 
     def read_contents(self, file):
         self.files = [filename.rstrip() for filename in file]
-        print self.files
 
     def write_contents(self, file):
         for f in self.files:
