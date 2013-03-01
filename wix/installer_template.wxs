@@ -16,9 +16,26 @@
                $COMPONENT_DEFS
             </Directory>
          </Directory>
+         <Directory Id="ProgramMenuFolder">
+            <Directory Id="ApplicationProgramsFolder" Name="XTF Surveyor"/>
+         </Directory>
       </Directory>
+
+      <!-- start menu shortcut -->
+      <DirectoryRef Id="ApplicationProgramsFolder">
+         <Component Id="ApplicationShortcut" Guid="*">
+            <Shortcut Id="ApplicationStartMenuShortcut"
+                      Name="XTF Surveyor"
+                      Description="View and explore XTF files"
+                      Target="[INSTALLLOCATION]xtfgui.exe"
+                      WorkingDirectory="INSTALLLOCATION"/>
+            <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
+            <RegistryValue Root="HKCU" Key="Software\AMIGE\XTFSurveyor" Name="installed" Type="integer" Value="1" KeyPath="yes"/>
+         </Component>
+      </DirectoryRef>
  
       <Feature Id='MainApplication' Title='Main Application' Level='1'>
+         <ComponentRef Id="ApplicationShortcut" />
          <ComponentRef Id='readme.txt' />
          $COMPONENT_REFS
       </Feature>
