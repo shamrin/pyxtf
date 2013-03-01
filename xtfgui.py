@@ -1,9 +1,12 @@
 import numpy
-from GUI import Application, ScrollableView, Document, Window, Cursor, rgb, Image, Frame, Font, Model
+from GUI import (Application, ScrollableView, Document, Window, Cursor, rgb,
+                 Image, Frame, Font, Model, Label, Menu)
 from GUI.Files import FileType
-from GUI.Geometry import pt_in_rect, offset_rect, rects_intersect, rect_sized, rect_height, rect_size
+from GUI.Geometry import (pt_in_rect, offset_rect, rects_intersect,
+                          rect_sized, rect_height, rect_size)
 from GUI.StdColors import black, red, light_grey, white
 from GUI.StdFonts import system_font
+from GUI.StdMenus import basic_menus, edit_cmds, pref_cmds, print_cmds
 from GUI.Numerical import image_from_ndarray
 
 class XTFApp(Application):
@@ -13,6 +16,17 @@ class XTFApp(Application):
         self.proj_type = FileType(name = "XTF Project", suffix = "project")
         self.file_type = self.proj_type
 
+        menus = basic_menus(
+            exclude = edit_cmds + pref_cmds + print_cmds,
+            substitutions = {
+                'new_cmd': 'New Project',
+                'open_cmd': 'Open Project...',
+                'save_cmd': 'Save Project',
+                'save_as_cmd': 'Save Project As...'})
+        profile_menu = Menu("Profiles", [("Import XTF...", 'import_cmd')])
+        menus.append(profile_menu)
+        self.menus = menus
+
     def open_app(self):
         self.new_cmd()
 
@@ -20,11 +34,16 @@ class XTFApp(Application):
         return Project(file_type = self.proj_type)
 
     def make_window(self, document):
-        win = Window(size = (400, 600), document = document)
+        win = Window(size = (500, 400), document = document)
 
-        file_view = FileView(document)
-        win.place(file_view, top = 0, bottom = 0, left = 0, right = 0,
-                             sticky = 'nesw')
+        if document.files:
+            file_view = FileView(document.files[0])
+            win.place(file_view, top = 0, bottom = 0, left = 0, right = 0,
+                                 sticky = 'nesw')
+        else:
+            win.place(Label(text='Open project or import XTF files.',
+                            font = Font(system_font.family, 30, 'normal')),
+                      top = 20, left = 20)
 
         win.show()
 
@@ -84,13 +103,13 @@ def image_from_rgb_array(array):
 
 
 class FileView(Frame):
-    def __init__(self, document):
+    def __init__(self, filename):
         Frame.__init__(self)
 
-        self.document = document
+        self.filename = filename
 
         for i, channel in enumerate(image_from_rgb_array(a)
-                                    for a in rgb_arrays(self.document.files[0])):
+                                    for a in rgb_arrays(filename)):
             view = ChannelView(model = Channel(channel, i+1), scrolling = 'h')
             self.place(view)
 
