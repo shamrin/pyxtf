@@ -1,8 +1,8 @@
 <?xml version='1.0'?><Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
    <Product Id='ECB635DC-825C-11E2-BCFE-1040F387B36C' Name='XTF Surveyor' Language='1033'
             Version='1.0' Manufacturer='AMIGE' UpgradeCode='DD5E1617-825C-11E2-BE8E-1040F387B36C'>
-      <Package Description='View and convert XTF files'
-               Comments='View and convert eXtended Triton Format files'
+      <Package Description='View and explore XTF files'
+               Comments='View, explore and convert eXtended Triton Format files'
                Manufacturer='AMIGE' InstallerVersion='200' Compressed='yes' />
  
       <Media Id='1' Cabinet='product.cab' EmbedCab='yes' />
