@@ -1,3 +1,5 @@
+import os
+
 import numpy
 from GUI import (Application, ScrollableView, Document, Window, Cursor, rgb,
                  Image, Frame, Font, Model, Label, Menu)
@@ -37,11 +39,11 @@ class XTFApp(Application):
         win = Window(size = (500, 400), document = document)
 
         if document.files:
-            file_view = FileView(document.files[0])
+            file_view = FileView(document.abspaths()[0])
             win.place(file_view, top = 0, bottom = 0, left = 0, right = 0,
                                  sticky = 'nesw')
         else:
-            win.place(Label(text='Open project or import XTF files.',
+            win.place(Label(text = 'Open project or import XTF files.',
                             font = Font(system_font.family, 30, 'normal')),
                       top = 20, left = 20)
 
@@ -153,6 +155,10 @@ class ChannelView(ScrollableView):
 class Project(Document):
 
     files = None
+
+    def abspaths(self):
+        return [f if os.path.isabs(f) else os.path.join(self.file.dir.path, f)
+                for f in self.files]
 
     def new_contents(self):
         self.files = []
