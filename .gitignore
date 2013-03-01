@@ -1,1 +1,5 @@
 /macdeps
+/windeps
+/build
+/dist
+*.pyc
