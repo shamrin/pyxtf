@@ -8,6 +8,8 @@ PY2EXE = py2exe-0.6.9.win32-py2.7.exe
 PYGUI = PyGUI-2.5.3.tar.gz
 WIN32 = pywin32-218.win32-py2.7.exe
 
+# TODO Wix: http://wix.codeplex.com/downloads/get/582218
+
 macdeps:
 	mkdir -p macdeps
 	cd macdeps; if ! [ -f $(MPLMAC) ]; then curl -O -C - "https://github.com/downloads/matplotlib/matplotlib/$(MPLMAC)"; fi

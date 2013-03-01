@@ -1,0 +1,34 @@
+<?xml version='1.0'?><Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+   <Product Id='ECB635DC-825C-11E2-BCFE-1040F387B36C' Name='XTF Surveyor' Language='1033'
+            Version='1.0' Manufacturer='AMIGE' UpgradeCode='DD5E1617-825C-11E2-BE8E-1040F387B36C'>
+      <Package Description='View and convert XTF files'
+               Comments='View and convert eXtended Triton Format files'
+               Manufacturer='AMIGE' InstallerVersion='200' Compressed='yes' />
+ 
+      <Media Id='1' Cabinet='product.cab' EmbedCab='yes' />
+ 
+      <Directory Id='TARGETDIR' Name='SourceDir'>
+         <Directory Id='ProgramFilesFolder' Name='PFiles'>
+            <Directory Id='INSTALLLOCATION' Name='XTF Surveyor'>
+               <Component Id='readme.txt' Guid='*'>
+                  <File Id='readme.txt' Name='readme.txt' DiskId='1' Source='readme.txt' />
+               </Component>
+               $COMPONENT_DEFS
+            </Directory>
+         </Directory>
+      </Directory>
+ 
+      <Feature Id='MainApplication' Title='Main Application' Level='1'>
+         <ComponentRef Id='readme.txt' />
+         $COMPONENT_REFS
+      </Feature>
+
+      <Property Id="WIXUI_INSTALLDIR" Value="INSTALLLOCATION" ></Property>
+      <UI>
+         <UIRef Id="WixUI_InstallDir" />
+         <!-- skip licence dialog -->
+         <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="2">1</Publish>
+         <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2">1</Publish>
+      </UI>
+   </Product>
+</Wix>
