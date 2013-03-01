@@ -24,6 +24,15 @@ windeps:
 	cd windeps; if ! [ -f $(PY2EXE) ]; then curl -L -o $(PY2EXE) "http://sourceforge.net/projects/py2exe/files/py2exe/0.6.9/$(PY2EXE)/download"; fi
 	cd windeps; if ! [ -f $(PYGUI) ]; then curl -O "http://www.cosc.canterbury.ac.nz/greg.ewing/python_gui/$(PYGUI)"; fi
 
+
+clean:
+	rm -rf dist
+	rm -rf build
+	rm wix/XTF_Surveyor.msi
+	rm wix/installer.wixobj
+	rm wix/installer.wxs
+	rm *.pyc
+
 installer:
 	build.cmd
 
