@@ -46,11 +46,9 @@ class XTFApp(Application):
         ProjectWindow(document).show()
 
 
-class ProjectWindow(Window, ViewBase):
+class ProjectWindow(Window):
     def __init__(self, document):
-        ViewBase.__init__(self)
         Window.__init__(self, size = (500, 400), document = document)
-        self.add_model(document)
 
         self.current_file = None
         self.project_changed(document)
@@ -223,7 +221,7 @@ class Project(Document):
         self.files.sort()
         for f in self.files:
             file.write(f + '\n')
-        self.notify_views('project_changed')
+        self.notify_windows()
 
     def normpath(self, p):
         if self.file:
@@ -239,6 +237,11 @@ class Project(Document):
                 self.files.append(f)
                 self.changed()
         self.files.sort()
-        self.notify_views('project_changed')
+        self.notify_windows()
+
+    def notify_windows(self):
+        for window in self.windows:
+            window.project_changed(self)
+
 
 XTFApp().run()
