@@ -52,7 +52,7 @@ class ProjectWindow(Window, ViewBase):
         Window.__init__(self, size = (500, 400), document = document)
         self.add_model(document)
 
-        self.current_file_index = None
+        self.current_file = None
         self.project_changed(document)
 
     def setup_menus(self, m):
@@ -60,8 +60,8 @@ class ProjectWindow(Window, ViewBase):
         m.import_cmd.enabled = True
         m.profiles_cmd.enabled = True
         m.profiles_cmd.checked = False
-        if self.current_file_index is not None:
-            m.profiles_cmd[self.current_file_index].checked = True
+        if self.current_file is not None:
+            m.profiles_cmd[self.current_file].checked = True
 
     def import_cmd(self):
         refs = request_old_files('Select XTF files to import')
@@ -69,7 +69,7 @@ class ProjectWindow(Window, ViewBase):
                                  for r in refs])
 
     def profiles_cmd(self, i):
-        self.current_file_index = i
+        self.current_file = i
         self.project_changed(self.document)
 
     def project_changed(self, model):
@@ -80,9 +80,9 @@ class ProjectWindow(Window, ViewBase):
             self.remove(c)
 
         if self.document.files:
-            if self.current_file_index is None:
-                self.current_file_index = 0
-            file_view = FileView(self.document.abspaths()[self.current_file_index])
+            if self.current_file is None:
+                self.current_file = 0
+            file_view = FileView(self.document.abspaths()[self.current_file])
             self.place(file_view, top = 0, bottom = 0, left = 0, right = 0,
                                  sticky = 'nesw')
         else:
