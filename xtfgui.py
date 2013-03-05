@@ -12,6 +12,8 @@ from GUI.StdFonts import system_font
 from GUI.StdMenus import basic_menus, edit_cmds, pref_cmds, print_cmds
 from GUI.Numerical import image_from_ndarray
 
+import xtf
+
 def app_menu(profiles = None):
     menus = basic_menus(
         exclude = edit_cmds + pref_cmds + print_cmds + 'revert_cmd',
@@ -86,7 +88,7 @@ class ProjectWindow(Window, ViewBase):
         else:
             self.place(Label(text = 'Open project or import XTF files.',
                              font = Font(system_font.family, 30, 'normal')),
-                      top = 20, left = 20)
+                       top = 20, left = 20)
 
 
 def normalize(a):
@@ -98,7 +100,6 @@ def normalize(a):
     return a.round()
 
 def rgb_arrays(xtf_file):
-    import xtf
     for a in xtf.read_XTF_as_grayscale_arrays(xtf_file):
         a = normalize(a)
 
@@ -149,10 +150,22 @@ class FileView(Frame):
 
         self.filename = filename
 
-        for i, channel in enumerate(image_from_rgb_array(a)
-                                    for a in rgb_arrays(filename)):
-            view = ChannelView(model = Channel(channel, i+1), scrolling = 'h')
-            self.place(view)
+        views = []
+        try:
+            for i, channel in enumerate(image_from_rgb_array(a)
+                                        for a in rgb_arrays(filename)):
+                v = ChannelView(model = Channel(channel, i+1), scrolling = 'h')
+                views.append(v)
+        except xtf.BadDataError, e:
+            # can't place Label directly: FileView content is auto-resized
+            frame = Frame()
+            frame.place(Label(text = 'Error in %s (%s)' % (filename, e),
+                              font = Font(system_font.family, 15, 'normal')),
+                        top = 20, left = 20)
+            self.place(frame)
+        else:
+            for v in views:
+                self.place(v)
 
         self.resized((0, 0))
 

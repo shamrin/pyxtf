@@ -314,6 +314,7 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
         tests = [(i, eval(test, {}, globals()), action)
                  for i, (test, action) in enumerate(tests) if test]
 
+        # string format spec indices
         s_indices = [i for i, c in enumerate(formats)
                        if re.match(r'(\d+)s', c)]
 
@@ -336,7 +337,7 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
         if values[i] != test:
             adj = {'!': 'Bad', '?': 'Unsupported'}[action]
             raise BadDataError(' '.join(w for w in
-                    [adj, data_name, name, '== %r' % v] if w))
+                    [adj, data_name, names[i], '== %r' % values[i]] if w))
 
     return length, dict_factory(zip(names, values))
 
