@@ -2,8 +2,9 @@ import os
 
 import numpy
 from GUI import (Application, ScrollableView, Document, Window, Cursor, rgb,
-                 Image, Frame, Font, Model, Label, Menu)
+                 Image, Frame, Font, Model, Label, Menu, ViewBase)
 from GUI.Files import FileType
+from GUI.FileDialogs import request_old_files
 from GUI.Geometry import (pt_in_rect, offset_rect, rects_intersect,
                           rect_sized, rect_height, rect_size)
 from GUI.StdColors import black, red, light_grey, white
@@ -11,23 +12,27 @@ from GUI.StdFonts import system_font
 from GUI.StdMenus import basic_menus, edit_cmds, pref_cmds, print_cmds
 from GUI.Numerical import image_from_ndarray
 
+def app_menu(profiles = None):
+    menus = basic_menus(
+        exclude = edit_cmds + pref_cmds + print_cmds + 'revert_cmd',
+        substitutions = {
+            'new_cmd': 'New Project',
+            'open_cmd': 'Open Project...',
+            'save_cmd': 'Save Project',
+            'save_as_cmd': 'Save Project As...'})
+    profile_menu = Menu("Profiles", [("Import XTF...", 'import_cmd'),
+                                     '-',
+                                     (profiles or [], 'profiles_cmd')])
+    menus.append(profile_menu)
+    return menus
+
 class XTFApp(Application):
 
     def __init__(self):
         Application.__init__(self)
         self.proj_type = FileType(name = "XTF Project", suffix = "project")
         self.file_type = self.proj_type
-
-        menus = basic_menus(
-            exclude = edit_cmds + pref_cmds + print_cmds,
-            substitutions = {
-                'new_cmd': 'New Project',
-                'open_cmd': 'Open Project...',
-                'save_cmd': 'Save Project',
-                'save_as_cmd': 'Save Project As...'})
-        profile_menu = Menu("Profiles", [("Import XTF...", 'import_cmd')])
-        menus.append(profile_menu)
-        self.menus = menus
+        self.menus = []
 
     def open_app(self):
         self.new_cmd()
@@ -36,18 +41,52 @@ class XTFApp(Application):
         return Project(file_type = self.proj_type)
 
     def make_window(self, document):
-        win = Window(size = (500, 400), document = document)
+        ProjectWindow(document).show()
 
-        if document.files:
-            file_view = FileView(document.abspaths()[0])
-            win.place(file_view, top = 0, bottom = 0, left = 0, right = 0,
+
+class ProjectWindow(Window, ViewBase):
+    def __init__(self, document):
+        ViewBase.__init__(self)
+        Window.__init__(self, size = (500, 400), document = document)
+        self.add_model(document)
+
+        self.current_file_index = None
+        self.project_changed(document)
+
+    def setup_menus(self, m):
+        Window.setup_menus(self, m)
+        m.import_cmd.enabled = True
+        m.profiles_cmd.enabled = True
+        m.profiles_cmd.checked = False
+        if self.current_file_index is not None:
+            m.profiles_cmd[self.current_file_index].checked = True
+
+    def import_cmd(self):
+        refs = request_old_files('Select XTF files to import')
+        self.document.add_files([os.path.join(r.dir.path, r.name)
+                                 for r in refs])
+
+    def profiles_cmd(self, i):
+        self.current_file_index = i
+        self.project_changed(self.document)
+
+    def project_changed(self, model):
+        self.menus = app_menu([f.replace('/', '\\')
+                               for f in sorted(self.document.files)])
+
+        for c in self.contents:
+            self.remove(c)
+
+        if self.document.files:
+            if self.current_file_index is None:
+                self.current_file_index = 0
+            file_view = FileView(self.document.abspaths()[self.current_file_index])
+            self.place(file_view, top = 0, bottom = 0, left = 0, right = 0,
                                  sticky = 'nesw')
         else:
-            win.place(Label(text = 'Open project or import XTF files.',
-                            font = Font(system_font.family, 30, 'normal')),
+            self.place(Label(text = 'Open project or import XTF files.',
+                             font = Font(system_font.family, 30, 'normal')),
                       top = 20, left = 20)
-
-        win.show()
 
 
 def normalize(a):
@@ -167,7 +206,26 @@ class Project(Document):
         self.files = [filename.rstrip() for filename in file]
 
     def write_contents(self, file):
+        self.files = [self.normpath(f) for f in self.files]
+        self.files.sort()
         for f in self.files:
             file.write(f + '\n')
+        self.notify_views('project_changed')
+
+    def normpath(self, p):
+        if self.file:
+            proj_dir = os.path.abspath(self.file.dir.path)
+            if os.path.abspath(p).startswith(proj_dir):
+                p = os.path.relpath(p, proj_dir)
+        return p.replace('\\', '/')
+
+    def add_files(self, filenames):
+        for f in filenames:
+            f = self.normpath(f)
+            if f not in self.files:
+                self.files.append(f)
+                self.changed()
+        self.files.sort()
+        self.notify_views('project_changed')
 
 XTFApp().run()
