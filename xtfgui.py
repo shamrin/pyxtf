@@ -48,9 +48,8 @@ class XTFApp(Application):
 
 class ProjectWindow(Window):
     def __init__(self, document):
-        Window.__init__(self, size = (500, 400), document = document)
-
         self.current_file = None
+        Window.__init__(self, size = (500, 400), document = document)
         self.project_changed(document)
 
     def setup_menus(self, m):
@@ -87,6 +86,16 @@ class ProjectWindow(Window):
             self.place(Label(text = 'Open project or import XTF files.',
                              font = Font(system_font.family, 30, 'normal')),
                        top = 20, left = 20)
+
+        self.update_title()
+
+    def update_title(self):
+        doc = self.document
+        if self.current_file is None:
+            self.set_title(doc.title)
+        else:
+            self.set_title('%s - %s' %
+                           (doc.files[self.current_file], doc.title))
 
 
 def normalize(a):
