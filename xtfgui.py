@@ -107,14 +107,14 @@ def normalize(a):
     return a.round()
 
 def rgb_arrays(xtf_file):
-    for a in xtf.read_XTF_as_grayscale_arrays(xtf_file):
+    for number, a in xtf.read_XTF_as_grayscale_arrays(xtf_file):
         a = normalize(a)
 
         # make grayscale RGB image: [x, y, ...] => [[x, x, x], [y, y, y], ...]
         g = numpy.empty(a.shape + (3,), dtype=numpy.uint8)
         g[...] = a[..., numpy.newaxis]
 
-        yield g
+        yield number, g
 
 def image_from_rgb_array(array):
     # based on image_from_ndarray and (buggy) GDIPlus.Bitmap.from_data
@@ -159,9 +159,9 @@ class FileView(Frame):
 
         views = []
         try:
-            for i, channel in enumerate(image_from_rgb_array(a)
-                                        for a in rgb_arrays(filename)):
-                v = ChannelView(model = Channel(channel, i+1), scrolling = 'h')
+            for num, a in rgb_arrays(filename):
+                image = image_from_rgb_array(a)
+                v = ChannelView(model = Channel(image, num), scrolling = 'h')
                 views.append(v)
         except xtf.BadDataError, e:
             # can't place Label directly: FileView content is auto-resized
@@ -208,7 +208,7 @@ class ChannelView(ScrollableView):
         canvas.moveto(10, self.height / 2)
         canvas.font = Font(system_font.family, 30, 'normal')
         canvas.textcolor = rgb(0.2, 0.4, 0.6)
-        canvas.show_text('channel %d' % (self.model.number,))
+        canvas.show_text('channel %d' % (self.model.number+1,))
 
 
 class Project(Document):

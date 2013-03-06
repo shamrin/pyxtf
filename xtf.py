@@ -344,14 +344,19 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
 PLOT_NTRACES = 3000
 
 def read_XTF_as_grayscale_arrays(infile):
+    """Return iterator over (channel_number, channel_data)
+
+    channel_data - grayscale numpy array (n_traces by trace_len)
+    """
+
     chaninfos, channel_trace = read_XTF(infile)
     channel_trace = sorted(channel_trace, key=lambda (c, t): c)
 
-    for i, (channel, traces) in enumerate(groupby(channel_trace,
-                                                  lambda (c, t): c)):
+    for i, (channel_number, traces) in enumerate(groupby(channel_trace,
+                                                         lambda (c, t): c)):
         traces = [t for c, t in traces]
         r = np.vstack(traces).transpose()
-        yield r
+        yield channel_number, r
 
 def main(infile):
     chaninfos, channel_trace = read_XTF(infile)
