@@ -8,7 +8,7 @@ import sys
 import re
 import struct
 from pprint import pprint, pformat
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from itertools import groupby, islice
 
 import numpy as np
@@ -109,6 +109,12 @@ def read_XTF(infile):
 
     pstart = HEADER_LEN
     return chaninfos, traces_gen(file_data[pstart:], chaninfos)
+
+TraceHeader = namedtuple('TraceHeader', '''channel_number
+    ping_date ping_time last_event_number ping_number
+    ship_speed ship_longitude ship_latitude
+    sensor_speed sensor_longitude sensor_latitude sensor_heading
+    layback cable_out slant_range time_delay seconds_per_ping num_samples''')
 
 def traces_gen(data, chaninfos):
     i = 0
@@ -249,7 +255,7 @@ def traces_gen(data, chaninfos):
                 trace = np.frombuffer(data[dstart:dstart+s*n].tobytes(),
                                       {1: np.int8, 2: np.int16}[s])
 
-                trace_header = dict(
+                trace_header = TraceHeader(
                     ping_date = '%04d-%02d-%02d' % (sheader['year'],
                                                     sheader['month'],
                                                     sheader['day']),
@@ -259,11 +265,11 @@ def traces_gen(data, chaninfos):
                     last_event_number = sheader['event_number'],
                     ping_number = sheader['ping_number'],
                     ship_speed = sheader['ship_speed'],
-                    ship_xcoordinate = sheader['ship_xcoordinate'],
-                    ship_ycoordinate = sheader['ship_ycoordinate'],
+                    ship_longitude = sheader['ship_xcoordinate'],
+                    ship_latitude = sheader['ship_ycoordinate'],
                     sensor_speed = sheader['sensor_speed'],
-                    sensor_xcoordinate = sheader['sensor_xcoordinate'],
-                    sensor_ycoordinate = sheader['sensor_ycoordinate'],
+                    sensor_longitude = sheader['sensor_xcoordinate'],
+                    sensor_latitude = sheader['sensor_ycoordinate'],
                     layback = sheader['layback'],
                     cable_out = sheader['cable_out'],
                     sensor_heading = sheader['sensor_heading'],
@@ -271,8 +277,7 @@ def traces_gen(data, chaninfos):
                     slant_range = cheader['slant_range'],
                     time_delay = cheader['time_delay'],
                     seconds_per_ping = cheader['seconds_per_ping'],
-                    num_samples = cheader['num_samples']
-                )
+                    num_samples = cheader['num_samples'])
 
                 yield trace_header, trace
 
@@ -376,11 +381,11 @@ def read_XTF_as_grayscale_arrays(infile):
     """
 
     chaninfos, header_trace = read_XTF(infile)
-    header_trace = sorted(header_trace, key=lambda (h, t): h['channel_number'])
+    header_trace = sorted(header_trace, key=lambda (h, t): h.channel_number)
 
     for i, (channel, traces) in enumerate(groupby(header_trace,
                                                   lambda (h, t):
-                                                      h['channel_number'])):
+                                                      h.channel_number)):
         traces = list(traces)
         headers = [h for h, t in traces]
         traces = [t for h, t in traces]
@@ -390,11 +395,11 @@ def read_XTF_as_grayscale_arrays(infile):
 
 def main(infile):
     chaninfos, header_trace = read_XTF(infile)
-    header_trace = sorted(header_trace, key=lambda (h, t): h['channel_number'])
+    header_trace = sorted(header_trace, key=lambda (h, t): h.channel_number)
 
     channels = [0] * len(chaninfos)
     for h, t in header_trace:
-        channels[h['channel_number']] += 1
+        channels[h.channel_number] += 1
 
     n_nonempty = len([c for c in channels if c])
 
@@ -411,7 +416,7 @@ def main(infile):
     #first = None
     for i, (channel, traces) in enumerate(groupby(header_trace,
                                                   lambda (h, t):
-                                                      h['channel_number'])):
+                                                      h.channel_number)):
         traces = list(t for h, t in islice(traces, PLOT_NTRACES))
         r = np.vstack(traces).transpose()
         print 'Plotting %d traces of channel %d (%.1fMb):' % \

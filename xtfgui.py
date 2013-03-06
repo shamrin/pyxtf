@@ -197,10 +197,11 @@ class FileView(Frame):
 
     def export_csv(self):
         ref = request_new_file('Export CSV file', file_type = self.csv_type)
-        head = self.headers[0].keys()
+        head = [n.replace('_', ' ').capitalize()
+                for n in xtf.TraceHeader._fields]
         if ref is not None:
-            outfile = csv.DictWriter(ref.open('wb'), head, delimiter = ';')
-            outfile.writerow(dict((n, n.replace('_', ' ')) for n in head))
+            outfile = csv.writer(ref.open('wb'), delimiter = ';')
+            outfile.writerow(head)
             for header in self.headers:
                 outfile.writerow(header)
 
