@@ -248,7 +248,33 @@ def traces_gen(data, chaninfos):
                 s = chaninfos[cheader['channel_number']]['bytes_per_sample']
                 trace = np.frombuffer(data[dstart:dstart+s*n].tobytes(),
                                       {1: np.int8, 2: np.int16}[s])
-                yield cheader['channel_number'], trace
+
+                trace_header = dict(
+                    ping_date = '%04d-%02d-%02d' % (sheader['year'],
+                                                    sheader['month'],
+                                                    sheader['day']),
+                    ping_time = '%02d:%02d.%02d' % (sheader['minute'],
+                                                    sheader['second'],
+                                                    sheader['hseconds']),
+                    last_event_number = sheader['event_number'],
+                    ping_number = sheader['ping_number'],
+                    ship_speed = sheader['ship_speed'],
+                    ship_xcoordinate = sheader['ship_xcoordinate'],
+                    ship_ycoordinate = sheader['ship_ycoordinate'],
+                    sensor_speed = sheader['sensor_speed'],
+                    sensor_xcoordinate = sheader['sensor_xcoordinate'],
+                    sensor_ycoordinate = sheader['sensor_ycoordinate'],
+                    layback = sheader['layback'],
+                    cable_out = sheader['cable_out'],
+                    sensor_heading = sheader['sensor_heading'],
+                    channel_number = cheader['channel_number'],
+                    slant_range = cheader['slant_range'],
+                    time_delay = cheader['time_delay'],
+                    seconds_per_ping = cheader['seconds_per_ping'],
+                    num_samples = cheader['num_samples']
+                )
+
+                yield trace_header, trace
 
         elif header_type == 'NOTES':
             nheader_len, nheader = unwrap(data[pheader_len:],
@@ -344,27 +370,31 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
 PLOT_NTRACES = 3000
 
 def read_XTF_as_grayscale_arrays(infile):
-    """Return iterator over (channel_number, channel_data)
+    """Return iterator over (channel_header, trace_headers, channel_data)
 
     channel_data - grayscale numpy array (n_traces by trace_len)
     """
 
-    chaninfos, channel_trace = read_XTF(infile)
-    channel_trace = sorted(channel_trace, key=lambda (c, t): c)
+    chaninfos, header_trace = read_XTF(infile)
+    header_trace = sorted(header_trace, key=lambda (h, t): h['channel_number'])
 
-    for i, (channel_number, traces) in enumerate(groupby(channel_trace,
-                                                         lambda (c, t): c)):
-        traces = [t for c, t in traces]
+    for i, (channel, traces) in enumerate(groupby(header_trace,
+                                                  lambda (h, t):
+                                                      h['channel_number'])):
+        traces = list(traces)
+        headers = [h for h, t in traces]
+        traces = [t for h, t in traces]
+
         r = np.vstack(traces).transpose()
-        yield channel_number, r
+        yield channel, headers, r
 
 def main(infile):
-    chaninfos, channel_trace = read_XTF(infile)
-    channel_trace = sorted(channel_trace, key=lambda (c, t): c)
+    chaninfos, header_trace = read_XTF(infile)
+    header_trace = sorted(header_trace, key=lambda (h, t): h['channel_number'])
 
     channels = [0] * len(chaninfos)
-    for c, t in channel_trace:
-        channels[c] += 1
+    for h, t in header_trace:
+        channels[h['channel_number']] += 1
 
     n_nonempty = len([c for c in channels if c])
 
@@ -379,9 +409,10 @@ def main(infile):
     buttons = []
 
     #first = None
-    for i, (channel, traces) in enumerate(groupby(channel_trace,
-                                                  lambda (c, t): c)):
-        traces = list(t for c, t in islice(traces, PLOT_NTRACES))
+    for i, (channel, traces) in enumerate(groupby(header_trace,
+                                                  lambda (h, t):
+                                                      h['channel_number'])):
+        traces = list(t for h, t in islice(traces, PLOT_NTRACES))
         r = np.vstack(traces).transpose()
         print 'Plotting %d traces of channel %d (%.1fMb):' % \
             (min(channels[i], PLOT_NTRACES),

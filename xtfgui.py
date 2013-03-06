@@ -1,10 +1,11 @@
 import os
+import csv
 
 import numpy
 from GUI import (Application, ScrollableView, Document, Window, Cursor, rgb,
                  Image, Frame, Font, Model, Label, Menu, ViewBase)
 from GUI.Files import FileType
-from GUI.FileDialogs import request_old_files
+from GUI.FileDialogs import request_old_files, request_new_file
 from GUI.Geometry import (pt_in_rect, offset_rect, rects_intersect,
                           rect_sized, rect_height, rect_size)
 from GUI.StdColors import black, red, light_grey, white
@@ -22,10 +23,10 @@ def app_menu(profiles = None):
             'open_cmd': 'Open Project...',
             'save_cmd': 'Save Project',
             'save_as_cmd': 'Save Project As...'})
-    profile_menu = Menu("Profiles", [("Import XTF...", 'import_cmd'),
-                                     '-',
-                                     (profiles or [], 'profiles_cmd')])
-    menus.append(profile_menu)
+    menus.append(Menu("Profiles", [("Import XTF files...", 'import_cmd'),
+                                    '-',
+                                    (profiles or [], 'profiles_cmd')]))
+    menus.append(Menu("Export", [("Export to CSV...", 'export_csv_cmd')]))
     return menus
 
 class XTFApp(Application):
@@ -55,33 +56,40 @@ class ProjectWindow(Window):
     def setup_menus(self, m):
         Window.setup_menus(self, m)
         m.import_cmd.enabled = True
+        if self.current_file is not None:
+            m.export_csv_cmd.enabled = True
         m.profiles_cmd.enabled = True
         m.profiles_cmd.checked = False
         if self.current_file is not None:
             m.profiles_cmd[self.current_file].checked = True
 
     def import_cmd(self):
-        refs = request_old_files('Select XTF files to import')
-        self.document.add_files([os.path.join(r.dir.path, r.name)
-                                 for r in refs])
+        refs = request_old_files('Import XTF files')
+        if refs is not None:
+            self.document.add_files([os.path.join(r.dir.path, r.name)
+                                     for r in refs])
 
     def profiles_cmd(self, i):
         self.current_file = i
         self.project_changed(self.document)
 
+    def export_csv_cmd(self):
+        self.file_view.export_csv()
+
     def project_changed(self, model):
+        doc = self.document
         self.menus = app_menu([f.replace('/', '\\')
-                               for f in sorted(self.document.files)])
+                               for f in sorted(doc.files)])
 
         for c in self.contents:
             self.remove(c)
 
-        if self.document.files:
+        if doc.files:
             if self.current_file is None:
                 self.current_file = 0
-            file_view = FileView(self.document.abspaths()[self.current_file])
-            self.place(file_view, top = 0, bottom = 0, left = 0, right = 0,
-                                 sticky = 'nesw')
+            self.file_view = FileView(doc.abspaths()[self.current_file])
+            self.place(self.file_view, top = 0, bottom = 0, left = 0, right = 0,
+                                       sticky = 'nesw')
         else:
             self.place(Label(text = 'Open project or import XTF files.',
                              font = Font(system_font.family, 30, 'normal')),
@@ -107,14 +115,14 @@ def normalize(a):
     return a.round()
 
 def rgb_arrays(xtf_file):
-    for number, a in xtf.read_XTF_as_grayscale_arrays(xtf_file):
+    for number, headers, a in xtf.read_XTF_as_grayscale_arrays(xtf_file):
         a = normalize(a)
 
         # make grayscale RGB image: [x, y, ...] => [[x, x, x], [y, y, y], ...]
         g = numpy.empty(a.shape + (3,), dtype=numpy.uint8)
         g[...] = a[..., numpy.newaxis]
 
-        yield number, g
+        yield number, headers, g
 
 def image_from_rgb_array(array):
     # based on image_from_ndarray and (buggy) GDIPlus.Bitmap.from_data
@@ -158,8 +166,10 @@ class FileView(Frame):
         self.filename = filename
 
         views = []
+        self.headers = []
         try:
-            for num, a in rgb_arrays(filename):
+            for num, headers, a in rgb_arrays(filename):
+                self.headers.extend(headers)
                 image = image_from_rgb_array(a)
                 v = ChannelView(model = Channel(image, num), scrolling = 'h')
                 views.append(v)
@@ -182,6 +192,17 @@ class FileView(Frame):
         for i, content in enumerate(self.contents):
             W, H = self.content_size
             content.bounds = 0, H / n * i, W, H / n * (i + 1)
+
+    csv_type = FileType(name = "CSV file", suffix = "csv")
+
+    def export_csv(self):
+        ref = request_new_file('Export CSV file', file_type = self.csv_type)
+        head = self.headers[0].keys()
+        if ref is not None:
+            outfile = csv.DictWriter(ref.open('wb'), head, delimiter = ';')
+            outfile.writerow(dict((n, n.replace('_', ' ')) for n in head))
+            for header in self.headers:
+                outfile.writerow(header)
 
 
 class Channel(Model):
