@@ -2,8 +2,8 @@ import os
 import csv
 
 import numpy
-from GUI import (Application, ScrollableView, Document, Window, Cursor, rgb,
-                 Image, Frame, Font, Model, Label, Menu, ViewBase)
+from GUI import Application, ScrollableView, Document, Window, Cursor, rgb
+from GUI import Image, Frame, Font, Model, Label, Menu, Column, CheckBox
 from GUI.Files import FileType
 from GUI.FileDialogs import request_old_files, request_new_file
 from GUI.Geometry import (pt_in_rect, offset_rect, rects_intersect,
@@ -74,22 +74,40 @@ class ProjectWindow(Window):
         self.project_changed(self.document)
 
     def export_csv_cmd(self):
-        self.file_view.export_csv()
+        self.xtf_file.export_csv()
 
     def project_changed(self, model):
         doc = self.document
         self.menus = app_menu([f.replace('/', '\\')
                                for f in sorted(doc.files)])
 
-        for c in self.contents:
+        for c in list(self.contents):
             self.remove(c)
 
         if doc.files:
             if self.current_file is None:
                 self.current_file = 0
-            self.file_view = FileView(doc.abspaths()[self.current_file])
-            self.place(self.file_view, top = 0, bottom = 0, left = 0, right = 0,
-                                       sticky = 'nesw')
+
+            filename = doc.abspaths()[self.current_file]
+            try:
+                self.xtf_file = XTFFile(filename)
+            except xtf.BadDataError, e:
+                self.place(Label(text = 'Error in %s (%s)' % (filename, e),
+                                 font = Font(system_font.family, 15, 'normal')),
+                            top = 20, left = 20)
+            else:
+                panel = Frame()
+                checks = [CheckBox('channel %d, traces: %d' % (c+1, n),
+                                   enabled = n > 0, value = n > 0)
+                          for c, n in enumerate(self.xtf_file.ntraces)]
+                panel.place_column(checks, top = 10, left = 10)
+                panel.shrink_wrap(padding = (40, 40))
+                self.place(panel, top = 0, bottom = 0, right = 0,
+                           sticky = 'nse')
+
+                file_view = FileView(self.xtf_file)
+                self.place(file_view, top = 0, bottom = 0, left = 0,
+                                      right = panel, sticky = 'nesw')
         else:
             self.place(Label(text = 'Open project or import XTF files.',
                              font = Font(system_font.family, 30, 'normal')),
@@ -114,8 +132,8 @@ def normalize(a):
     a *= 255.0 / (hi - lo)
     return a.round()
 
-def rgb_arrays(xtf_file):
-    for number, headers, a in xtf.read_XTF_as_grayscale_arrays(xtf_file):
+def rgb_arrays(arrays_gen):
+    for number, headers, a in arrays_gen:
         a = normalize(a)
 
         # make grayscale RGB image: [x, y, ...] => [[x, x, x], [y, y, y], ...]
@@ -159,39 +177,21 @@ def image_from_rgb_array(array):
     return image
 
 
-class FileView(Frame):
+class XTFFile(object):
     def __init__(self, filename):
-        Frame.__init__(self)
-
         self.filename = filename
 
-        views = []
+        nchannels, arrays_gen = xtf.read_XTF_as_grayscale_arrays(filename)
+
         self.headers = []
-        try:
-            for num, headers, a in rgb_arrays(filename):
-                self.headers.extend(headers)
-                image = image_from_rgb_array(a)
-                v = ChannelView(model = Channel(image, num), scrolling = 'h')
-                views.append(v)
-        except xtf.BadDataError, e:
-            # can't place Label directly: FileView content is auto-resized
-            frame = Frame()
-            frame.place(Label(text = 'Error in %s (%s)' % (filename, e),
-                              font = Font(system_font.family, 15, 'normal')),
-                        top = 20, left = 20)
-            self.place(frame)
-        else:
-            for v in views:
-                self.place(v)
+        self.channels = []
+        self.ntraces = [0] * nchannels
 
-        self.resized((0, 0))
-
-    def resized(self, delta):
-        # make sure content components evenly fill all the space
-        n = len(self.contents)
-        for i, content in enumerate(self.contents):
-            W, H = self.content_size
-            content.bounds = 0, H / n * i, W, H / n * (i + 1)
+        for num, headers, a in rgb_arrays(arrays_gen):
+            self.ntraces[num] = len(headers)
+            self.headers.extend(headers)
+            image = image_from_rgb_array(a)
+            self.channels.append(Channel(image, num))
 
     csv_type = FileType(name = "CSV file", suffix = "csv")
 
@@ -204,6 +204,22 @@ class FileView(Frame):
             outfile.writerow(head)
             for header in self.headers:
                 outfile.writerow(header)
+
+
+class FileView(Frame):
+    def __init__(self, xtf_file):
+        Frame.__init__(self)
+
+        for channel in xtf_file.channels:
+            self.place(ChannelView(model = channel, scrolling = 'h'))
+        self.resized((0, 0))
+
+    def resized(self, delta):
+        # make sure content components evenly fill all the space
+        n = len(self.contents)
+        for i, content in enumerate(self.contents):
+            W, H = self.content_size
+            content.bounds = 0, H / n * i, W, H / n * (i + 1)
 
 
 class Channel(Model):
