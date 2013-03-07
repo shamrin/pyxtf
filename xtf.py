@@ -376,25 +376,24 @@ PLOT_NTRACES = 3000
 
 def read_XTF_as_grayscale_arrays(infile):
     chaninfos, header_trace = read_XTF(infile)
-    return len(chaninfos), grayscale_arrays_gen(header_trace)
+    return len(chaninfos), grayscale_arrays_gen(header_trace, chaninfos)
 
-def grayscale_arrays_gen(header_trace):
-    """Return iterator over (channel_header, trace_headers, channel_data)
+def grayscale_arrays_gen(header_trace, chaninfos):
+    """Iterator over channel info tuples: (number, type, trace_headers, data)
 
-    channel_data - grayscale numpy array (n_traces by trace_len)
+    data - grayscale numpy array (n_traces by trace_len)
     """
 
     header_trace = sorted(header_trace, key=lambda (h, t): h.channel_number)
 
-    for i, (channel, traces) in enumerate(groupby(header_trace,
-                                                  lambda (h, t):
-                                                      h.channel_number)):
+    for num, traces in groupby(header_trace, lambda (h, t): h.channel_number):
         traces = list(traces)
         headers = [h for h, t in traces]
         traces = [t for h, t in traces]
+        type = CHAN_TYPES[chaninfos[num]['type_of_channel']]
 
         r = np.vstack(traces).transpose()
-        yield channel, headers, r
+        yield num, type, headers, r
 
 def main(infile):
     chaninfos, header_trace = read_XTF(infile)

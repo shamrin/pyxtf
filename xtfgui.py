@@ -97,7 +97,10 @@ class ProjectWindow(Window):
                             top = 20, left = 20)
             else:
                 panel = Frame()
-                checks = [CheckBox('channel %d, traces: %d' % (c+1, n),
+                checks = [CheckBox(', '.join(w for w in
+                                             ['channel %d' % (c+1),
+                                              self.xtf_file.types.get(c),
+                                              'traces: %d' % n] if w),
                                    enabled = n > 0, value = n > 0)
                           for c, n in enumerate(self.xtf_file.ntraces)]
                 panel.place_column(checks, top = 10, left = 10)
@@ -132,15 +135,14 @@ def normalize(a):
     a *= 255.0 / (hi - lo)
     return a.round()
 
-def rgb_arrays(arrays_gen):
-    for number, headers, a in arrays_gen:
-        a = normalize(a)
+def rgb_array(gray):
+    a = normalize(gray)
 
-        # make grayscale RGB image: [x, y, ...] => [[x, x, x], [y, y, y], ...]
-        g = numpy.empty(a.shape + (3,), dtype=numpy.uint8)
-        g[...] = a[..., numpy.newaxis]
+    # make grayscale RGB image: [x, y, ...] => [[x, x, x], [y, y, y], ...]
+    g = numpy.empty(a.shape + (3,), dtype=numpy.uint8)
+    g[...] = a[..., numpy.newaxis]
 
-        yield number, headers, g
+    return g
 
 def image_from_rgb_array(array):
     # based on image_from_ndarray and (buggy) GDIPlus.Bitmap.from_data
@@ -186,9 +188,12 @@ class XTFFile(object):
         self.headers = []
         self.channels = []
         self.ntraces = [0] * nchannels
+        self.types = {}
 
-        for num, headers, a in rgb_arrays(arrays_gen):
+        for num, type, headers, a in arrays_gen:
+            a = rgb_array(a)
             self.ntraces[num] = len(headers)
+            self.types[num] = type
             self.headers.extend(headers)
             image = image_from_rgb_array(a)
             self.channels.append(Channel(image, num))
