@@ -118,6 +118,10 @@ class ProjectWindow(Window):
 
         self.update_title()
 
+        # make sure .setup_menus() gets called
+        # (it usually does, except after toggle-some-control-then-change-file)
+        self.become_target()
+
     def update_title(self):
         doc = self.document
         if self.current_file is None:
