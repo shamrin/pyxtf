@@ -328,6 +328,36 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
     (6, {'magic': 10, 'data': 'DATA'})
     """
 
+    formats, names, tests, s_indices = parse(spec)
+
+    # unpack binary data
+    fmt = '<' + ''.join(formats)
+    length = struct.calcsize(fmt)
+    sub = binary[:length]
+    if isinstance(sub, memoryview):
+        sub = sub.tobytes()
+    values = list(struct.unpack(fmt, sub))
+
+    # strip padding from end of strings
+    for i in s_indices:
+        values[i] = values[i].rstrip('\x00\r')
+
+    # run optional tests
+    for i, test, action in tests:
+        if values[i] != test:
+            adj = {'!': 'Bad', '?': 'Unsupported'}[action]
+            raise BadDataError(' '.join(w for w in
+                    [adj, data_name, names[i], '== %r' % values[i]] if w))
+
+    return length, dict_factory(zip(names, values))
+
+def wrap(data, spec):
+    formats, names, tests, s_indices = parse(spec)
+    fmt = '<' + ''.join(formats)
+    return struct.pack(fmt, *[data[name] for name in names])
+
+
+def parse(spec):
     if spec in _unwrap_cache:
         formats, names, tests, s_indices = _unwrap_cache[spec]
     else:
@@ -355,26 +385,8 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
 
         _unwrap_cache[spec] = formats, names, tests, s_indices
 
-    # unpack binary data
-    fmt = '<' + ''.join(formats)
-    length = struct.calcsize(fmt)
-    sub = binary[:length]
-    if isinstance(sub, memoryview):
-        sub = sub.tobytes()
-    values = list(struct.unpack(fmt, sub))
+    return formats, names, tests, s_indices
 
-    # rstrip null bytes and '\r' from strings
-    for i in s_indices:
-        values[i] = values[i].rstrip('\x00\r')
-
-    # run optional tests
-    for i, test, action in tests:
-        if values[i] != test:
-            adj = {'!': 'Bad', '?': 'Unsupported'}[action]
-            raise BadDataError(' '.join(w for w in
-                    [adj, data_name, names[i], '== %r' % values[i]] if w))
-
-    return length, dict_factory(zip(names, values))
 
 PLOT_NTRACES = 3000
 
