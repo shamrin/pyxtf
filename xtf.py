@@ -328,10 +328,9 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
     (6, {'magic': 10, 'data': 'DATA'})
     """
 
-    formats, names, tests, s_indices = parse(spec)
+    fmt, names, tests, s_indices = parse(spec)
 
     # unpack binary data
-    fmt = '<' + ''.join(formats)
     length = struct.calcsize(fmt)
     sub = binary[:length]
     if isinstance(sub, memoryview):
@@ -352,14 +351,13 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
     return length, dict_factory(zip(names, values))
 
 def wrap(data, spec):
-    formats, names, tests, s_indices = parse(spec)
-    fmt = '<' + ''.join(formats)
+    fmt, names, tests, s_indices = parse(spec)
     return struct.pack(fmt, *[data[name] for name in names])
 
 
 def parse(spec):
     if spec in _unwrap_cache:
-        formats, names, tests, s_indices = _unwrap_cache[spec]
+        fmt, names, tests, s_indices = _unwrap_cache[spec]
     else:
         matches = [re.match("""(\w+)           # struct format
                                \s+
@@ -383,9 +381,11 @@ def parse(spec):
         s_indices = [i for i, c in enumerate(formats)
                        if re.match(r'(\d+)s', c)]
 
-        _unwrap_cache[spec] = formats, names, tests, s_indices
+        fmt = '<' + ''.join(formats)
 
-    return formats, names, tests, s_indices
+        _unwrap_cache[spec] = fmt, names, tests, s_indices
+
+    return fmt, names, tests, s_indices
 
 
 PLOT_NTRACES = 3000
