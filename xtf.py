@@ -120,7 +120,11 @@ def traces_gen(data, chaninfos):
     i = 0
     while data:
         sys.stdout.write('\rPacket: %d' % i)
-        sys.stdout.flush()
+
+        # only the last message is shown without flush(), but flushing too
+        # often slows things down
+        if i % 42 == 0:
+            sys.stdout.flush()
 
         pheader_len, pheader = unwrap(data,
                                       """H magic_number == 0xFACE !
