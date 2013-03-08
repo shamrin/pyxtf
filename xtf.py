@@ -6,7 +6,7 @@ Usage:
 
 import sys
 import re
-import struct
+from struct import Struct
 from pprint import pprint, pformat
 from collections import OrderedDict, namedtuple
 from itertools import groupby, islice
@@ -310,7 +310,6 @@ def traces_gen(data, chaninfos):
 class BadDataError(Exception):
     pass
 
-_unwrap_cache = {}
 def unwrap(binary, spec, data_name=None, dict_factory=dict):
     """Unwrap `binary` according to `spec`, return (consumed_length, data)
 
@@ -328,14 +327,14 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
     (6, {'magic': 10, 'data': 'DATA'})
     """
 
-    fmt, names, tests, s_indices = parse(spec)
+    struct, names, tests, s_indices = parse(spec)
 
     # unpack binary data
-    length = struct.calcsize(fmt)
+    length = struct.size
     sub = binary[:length]
     if isinstance(sub, memoryview):
         sub = sub.tobytes()
-    values = list(struct.unpack(fmt, sub))
+    values = list(struct.unpack(sub))
 
     # strip padding from end of strings
     for i in s_indices:
@@ -351,14 +350,14 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
     return length, dict_factory(zip(names, values))
 
 def wrap(data, spec):
-    fmt, names, tests, s_indices = parse(spec)
-    return struct.pack(fmt, *[data[name] for name in names])
+    struct, names, tests, s_indices = parse(spec)
+    return struct.pack(*[data[name] for name in names])
 
-
+_cache = {}
 def parse(spec):
-    if spec in _unwrap_cache:
-        fmt, names, tests, s_indices = _unwrap_cache[spec]
-    else:
+    try:
+        return _cache[spec]
+    except KeyError:
         matches = [re.match("""(\w+)           # struct format
                                \s+
                                (\w+)           # field name
@@ -381,11 +380,10 @@ def parse(spec):
         s_indices = [i for i, c in enumerate(formats)
                        if re.match(r'(\d+)s', c)]
 
-        fmt = '<' + ''.join(formats)
+        struct = Struct('<' + ''.join(formats))
 
-        _unwrap_cache[spec] = fmt, names, tests, s_indices
-
-    return fmt, names, tests, s_indices
+        _cache[spec] = struct, names, tests, s_indices
+        return _cache[spec]
 
 
 PLOT_NTRACES = 3000
