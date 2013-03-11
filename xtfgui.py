@@ -2,7 +2,7 @@ import os
 import csv
 
 import numpy
-from GUI import Application, ScrollableView, Document, Window, Cursor, rgb
+from GUI import Application, ScrollableView, Document, Window, Button, rgb
 from GUI import Image, Frame, Font, Model, Label, Menu, Column, CheckBox
 from GUI.Files import FileType
 from GUI.FileDialogs import request_old_files, request_new_file
@@ -76,6 +76,10 @@ class ProjectWindow(Window):
     def export_csv_cmd(self):
         self.xtf_file.export_csv()
 
+    def save_xtf_cmd(self):
+        numbers = [i for i, cb in enumerate(self.checkboxes) if cb.value]
+        self.xtf_file.save_xtf(numbers)
+
     def project_changed(self, model):
         doc = self.document
         self.menus = app_menu([f.replace('/', '\\')
@@ -94,7 +98,7 @@ class ProjectWindow(Window):
             except xtf.BadDataError, e:
                 self.place(Label(text = 'Error in %s (%s)' % (filename, e),
                                  font = Font(system_font.family, 15, 'normal')),
-                            top = 20, left = 20)
+                           top = 20, left = 20)
             else:
                 panel = Frame()
                 checks = [CheckBox(', '.join(w for w in
@@ -103,10 +107,12 @@ class ProjectWindow(Window):
                                               'traces: %d' % n] if w),
                                    enabled = n > 0, value = n > 0)
                           for c, n in enumerate(self.xtf_file.ntraces)]
-                panel.place_column(checks, top = 10, left = 10)
+                button = Button('Save to XTF...', action = 'save_xtf_cmd')
+                panel.place_column(checks + [button], top = 10, left = 10)
                 panel.shrink_wrap(padding = (40, 40))
                 self.place(panel, top = 0, bottom = 0, right = 0,
                            sticky = 'nse')
+                self.checkboxes = checks
 
                 file_view = FileView(self.xtf_file)
                 self.place(file_view, top = 0, bottom = 0, left = 0,
@@ -187,14 +193,16 @@ class XTFFile(object):
     def __init__(self, filename):
         self.filename = filename
 
-        nchannels, arrays_gen = xtf.read_XTF_as_grayscale_arrays(filename)
+        header, nchannels, arrays = xtf.read_XTF_as_grayscale_arrays(filename)
+        print '\n'.join('%s: %r' % (k.replace('_', ' '), v)
+                        for k, v in header.items())
 
         self.headers = []
         self.channels = []
         self.ntraces = [0] * nchannels
         self.types = {}
 
-        for num, type, headers, a in arrays_gen:
+        for num, type, headers, a in arrays:
             a = rgb_array(a)
             self.ntraces[num] = len(headers)
             self.types[num] = type
@@ -202,17 +210,23 @@ class XTFFile(object):
             image = image_from_rgb_array(a)
             self.channels.append(Channel(image, num))
 
-    csv_type = FileType(name = "CSV file", suffix = "csv")
+    csv_type = FileType(name = 'CSV file', suffix = 'csv')
+    xtf_type = FileType(name = 'XTF file', suffix = 'xtf')
 
     def export_csv(self):
         ref = request_new_file('Export CSV file', file_type = self.csv_type)
-        head = [n.replace('_', ' ').capitalize()
-                for n in xtf.TraceHeader._fields]
         if ref is not None:
             outfile = csv.writer(ref.open('wb'), delimiter = ';')
-            outfile.writerow(head)
+            outfile.writerow([n.replace('_', ' ').capitalize()
+                              for n in xtf.TraceHeader._fields])
             for header in self.headers:
                 outfile.writerow(header)
+
+    def save_xtf(self, channel_numbers):
+        ref = request_new_file('Save XTF file', file_type = self.xtf_type)
+        if ref is not None:
+            xtf.copy_XTF(self.filename, os.path.join(ref.dir.path, ref.name),
+                         channel_numbers)
 
 
 class FileView(Frame):

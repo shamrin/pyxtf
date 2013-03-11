@@ -19,7 +19,7 @@ CHAN_TYPES = {
     2: 'stbd',
     3: 'bathymetry',
 }
-CHAN_INFO_LEN = 128
+CHANINFO_LEN = 128
 HEADER_TYPES = {
     0: 'SONAR', # sidescan and subbottom
     1: 'NOTES', # notes - text annotation
@@ -33,82 +33,95 @@ HEADER_TYPES = {
 }
 HEADER_LEN = 1024
 
+HEADER = """
+    B file_format == 0x7b !
+    B system_type
+    8s recording_program_name
+    8s recording_program_version
+    16s sonar_name
+    H sonar_type
+    64s note_string
+    64s this_file_name
+    H nav_units
+    H number_of_sonar_channels
+    H number_of_bathymetry_channels
+    B number_of_snippet_channels
+    B number_of_forward_look_arrays
+    H number_of_echo_strength_channels
+    B number_of_interferometry_channels
+    B reserved1
+    H reserved2
+    f reference_point_height
+    12s projection_type
+    10s spheroid_type
+    l navigation_latency
+    f origin_x
+    f origin_y
+    f nav_offset_y
+    f nav_offset_x
+    f nav_offset_z
+    f nav_offset_yaw
+    f MRU_offset_y
+    f MRU_offset_x
+    f MRU_offset_z
+    f MRU_offset_yaw
+    f MRU_offset_pitch
+    f MRU_offset_roll
+"""
+
+CHANINFO = """
+    B type_of_channel
+    B sub_channel_number
+    H correction_flags
+    H uni_polar
+    H bytes_per_sample
+    I reserved1
+    16s channel_name
+    f volt_scale
+    f frequency
+    f horiz_beam_angle
+    f tilt_angle
+    f beam_width
+    f offset_x
+    f offset_y
+    f offset_z
+    f offset_yaw
+    f offset_pitch
+    f offset_roll
+    H beams_per_array
+    54s reserved2
+"""
+
 def read_XTF(infile):
     file_data = memoryview(open(infile, 'rb').read())
-    header_len, header = unwrap(file_data,
-                                """B file_format == 0x7b !
-                                   B system_type
-                                   8s recording_program_name
-                                   8s recording_program_version
-                                   16s sonar_name
-                                   H sonar_type
-                                   64s note_string
-                                   64s this_file_name
-                                   H nav_units
-                                   H number_of_sonar_channels
-                                   H number_of_bathimetry_channels
-                                   B number_of_snippet_channels
-                                   B number_of_forward_look_arrays
-                                   H number_of_echo_strength_channels
-                                   B number_of_interferometry_channels
-                                   B reserved1
-                                   H reserved2
-                                   f reference_point_height
-                                   12s projection_type
-                                   10s spheroid_type
-                                   l navigation_latency
-                                   f origin_x
-                                   f origin_y
-                                   f nav_offset_y
-                                   f nav_offset_x
-                                   f nav_offset_z
-                                   f nav_offset_yaw
-                                   f MRU_offset_y
-                                   f MRU_offset_x
-                                   f MRU_offset_z
-                                   f MRU_offset_yaw
-                                   f MRU_offset_pitch
-                                   f MRU_offset_roll
-                                """, dict_factory=OrderedDict)
-    pprint(header.items())
+    header_len, header = unwrap(file_data, HEADER, dict_factory=OrderedDict)
     nchannels = (header['number_of_sonar_channels'] +
-                 header['number_of_bathimetry_channels'])
+                 header['number_of_bathymetry_channels'])
     assert nchannels <= 6
-    print 'Channels:'
     chaninfos = []
     for i in range(nchannels):
-        chaninfo_len, chaninfo = unwrap(file_data[header_len+i*CHAN_INFO_LEN:],
-                                          """B type_of_channel
-                                             B sub_channel_number
-                                             H correction_flags
-                                             H uni_polar
-                                             H bytes_per_sample
-                                             I reserved1
-                                             16s channel_name
-                                             f volt_scale
-                                             f frequency
-                                             f horiz_beam_angle
-                                             f tilt_angle
-                                             f beam_width
-                                             f offset_x
-                                             f offset_y
-                                             f offset_z
-                                             f offset_yaw
-                                             f offset_pitch
-                                             f offset_roll
-                                             H beams_per_array
-                                             54s reserved2
-                                          """)
-        assert chaninfo_len == CHAN_INFO_LEN
-        print '  %d %d %s "%s"' % (i+1,
-                                   chaninfo['sub_channel_number'],
-                                   CHAN_TYPES[chaninfo['type_of_channel']],
-                                   chaninfo['channel_name'])
-        #pprint(chaninfo.items())
+        chaninfo_len, chaninfo = unwrap(file_data[header_len+i*CHANINFO_LEN:],
+                                        CHANINFO)
+        assert chaninfo_len == CHANINFO_LEN
         chaninfos.append(chaninfo)
 
     pstart = HEADER_LEN
-    return chaninfos, traces_gen(file_data[pstart:], chaninfos)
+    return header, chaninfos, packets_gen(file_data[pstart:], chaninfos)
+
+def write_XTF(outfile, header, chaninfos, packets):
+    with open(outfile, 'wb') as out:
+        header_parts = [wrap(header, HEADER)]
+        header_parts.extend(wrap(chaninfo, CHANINFO) for chaninfo in chaninfos)
+        out.write(''.join(header_parts).ljust(HEADER_LEN, '\x00'))
+
+        for p in packets:
+            packet_parts = [
+                wrap(p.pheader, PACKET_HEADER),
+                wrap(p.sheader, SONAR_HEADER),
+                wrap(p.cheader, SONAR_CHANNEL_HEADER),
+                p.raw_trace]
+            packet_len = p.pheader['num_bytes_this_record']
+            out.write(''.join(packet_parts).ljust(packet_len, '\x00'))
 
 TraceHeader = namedtuple('TraceHeader', '''channel_number
     ping_date ping_time last_event_number ping_number
@@ -116,7 +129,150 @@ TraceHeader = namedtuple('TraceHeader', '''channel_number
     sensor_speed sensor_longitude sensor_latitude sensor_heading
     layback cable_out slant_range time_delay seconds_per_ping num_samples''')
 
-def traces_gen(data, chaninfos):
+class Packet(namedtuple('Packet', 'pheader sheader cheader trace raw_trace')):
+        __slots__ = () # prevent instance dict creation (see namedtuple docs)
+
+        def trace_header(self):
+            sheader, cheader = self.sheader, self.cheader
+            return TraceHeader(
+                ping_date = '%04d-%02d-%02d' % (sheader['year'],
+                                                sheader['month'],
+                                                sheader['day']),
+                ping_time = '%02d:%02d.%02d' % (sheader['minute'],
+                                                sheader['second'],
+                                                sheader['hseconds']),
+                last_event_number = sheader['event_number'],
+                ping_number = sheader['ping_number'],
+                ship_speed = sheader['ship_speed'],
+                ship_longitude = sheader['ship_xcoordinate'],
+                ship_latitude = sheader['ship_ycoordinate'],
+                sensor_speed = sheader['sensor_speed'],
+                sensor_longitude = sheader['sensor_xcoordinate'],
+                sensor_latitude = sheader['sensor_ycoordinate'],
+                layback = sheader['layback'],
+                cable_out = sheader['cable_out'],
+                sensor_heading = sheader['sensor_heading'],
+                channel_number = cheader['channel_number'],
+                slant_range = cheader['slant_range'],
+                time_delay = cheader['time_delay'],
+                seconds_per_ping = cheader['seconds_per_ping'],
+                num_samples = cheader['num_samples'])
+
+        @property
+        def channel_number(self):
+            return self.cheader['channel_number']
+
+PACKET_HEADER = """
+    H magic_number == 0xFACE !
+    B header_type
+    B sub_channel_number
+    H num_chans_to_follow
+    4s reserved1
+    I num_bytes_this_record
+"""
+
+SONAR_HEADER = """
+    H year
+    B month
+    B day
+    B hour
+    B minute
+    B second
+    B hseconds
+    H julian_day
+    I event_number
+    I ping_number
+    f sound_velocity
+    f ocean_tide
+    I reserved2
+    f conductiviy_freq
+    f temperature_freq
+    f pressure_freq
+    f pressure_temp
+    f conductivity
+    f water_temperature
+    f pressure
+    f computed_sound_velocity
+    f mag_x
+    f mag_y
+    f mag_z
+    f aux_val1
+    f aux_val2
+    f aux_val3
+    f aux_val4
+    f aux_val5
+    f aux_val6
+    f speed_log
+    f turbidity
+    f ship_speed
+    f ship_gyro
+    d ship_ycoordinate
+    d ship_xcoordinate
+    H ship_alititude
+    H ship_depth
+    B fix_time_hour
+    B fix_time_minute
+    B fix_time_second
+    B fix_time_hsecond
+    f sensor_speed
+    f KP
+    d sensor_ycoordinate
+    d sensor_xcoordinate
+    H sonar_status
+    H range_to_fish
+    H bearing_to_fish
+    H cable_out
+    f layback
+    f cable_tension
+    f sensor_depth
+    f sensor_primary_altitude
+    f sensor_aux_altitude
+    f sensor_pitch
+    f sensor_roll
+    f sensor_heading
+    f heave
+    f yaw
+    I attitude_time_lag
+    f DOT
+    I nav_fix_milliseconds
+    B computer_clock_hour
+    B computer_clock_minute
+    B computer_clock_second
+    B computer_clock_hsec
+    h fish_position_delta_x
+    h fish_position_delta_y
+    B fish_position_error_code
+    11s reserved3
+"""
+
+SONAR_CHANNEL_HEADER = """
+    H channel_number
+    H downsample_method
+    f slant_range
+    f ground_range
+    f time_delay
+    f time_duration
+    f seconds_per_ping
+    H processing_flags
+    H frequency
+    H initial_gain_code
+    H gain_code
+    H band_width
+    I contact_number
+    H contact_classification
+    B conact_sub_number
+    b contact_type
+    I num_samples
+    H millivolt_scale
+    f contact_time_of_track
+    B contact_close_number
+    B reserved2
+    f fixed_VSOP
+    h weight
+    4s reserved
+"""
+
+def packets_gen(data, chaninfos):
     i = 0
     while data:
         sys.stdout.write('\rPacket: %d' % i)
@@ -126,127 +282,21 @@ def traces_gen(data, chaninfos):
         if i % 42 == 0:
             sys.stdout.flush()
 
-        pheader_len, pheader = unwrap(data,
-                                      """H magic_number == 0xFACE !
-                                         B header_type
-                                         B sub_channel_number
-                                         H num_chans_to_follow
-                                         4s reserved1
-                                         I num_bytes_this_record
-                                      """)
+        pheader_len, pheader = unwrap(data, PACKET_HEADER)
         #pprint(pheader.items())
         header_type = HEADER_TYPES.get(pheader['header_type'], 
                                        'UNKNOWN (%d)' % pheader['header_type'])
         if header_type == 'SONAR':
-            sheader_len, sheader = unwrap(data[pheader_len:],
-                                          """H year
-                                             B month
-                                             B day
-                                             B hour
-                                             B minute
-                                             B second
-                                             B hseconds
-                                             H julian_day
-                                             I event_number
-                                             I ping_number
-                                             f sound_velocity
-                                             f ocean_tide
-                                             I reserved2
-                                             f conductiviy_freq
-                                             f temperature_freq
-                                             f pressure_freq
-                                             f pressure_temp
-                                             f conductivity
-                                             f water_temperature
-                                             f pressure
-                                             f computed_sound_velocity
-                                             f mag_x
-                                             f mag_y
-                                             f mag_z
-                                             f aux_val1
-                                             f aux_val2
-                                             f aux_val3
-                                             f aux_val4
-                                             f aux_val5
-                                             f aux_val6
-                                             f speed_log
-                                             f turbidity
-                                             f ship_speed
-                                             f ship_gyro
-                                             d ship_ycoordinate
-                                             d ship_xcoordinate
-                                             H ship_alititude
-                                             H ship_depth
-                                             B fix_time_hour
-                                             B fix_time_minute
-                                             B fix_time_second
-                                             B fix_time_hsecond
-                                             f sensor_speed
-                                             f KP
-                                             d sensor_ycoordinate
-                                             d sensor_xcoordinate
-                                             H sonar_status
-                                             H range_to_fish
-                                             H bearing_to_fish
-                                             H cable_out
-                                             f layback
-                                             f cable_tension
-                                             f sensor_depth
-                                             f sensor_primary_altitude
-                                             f sensor_aux_altitude
-                                             f sensor_pitch
-                                             f sensor_roll
-                                             f sensor_heading
-                                             f heave
-                                             f yaw
-                                             I attitude_time_lag
-                                             f DOT
-                                             I nav_fix_milliseconds
-                                             B computer_clock_hour
-                                             B computer_clock_minute
-                                             B computer_clock_second
-                                             B computer_clock_hsec
-                                             h fish_position_delta_x
-                                             h fish_position_delta_y
-                                             B fish_position_error_code
-                                             11s reserved3
-                                          """, 'XTFPINGHEADER')
+            sheader_len, sheader = unwrap(data[pheader_len:], SONAR_HEADER,
+                                                              'XTFPINGHEADER')
             assert pheader_len + sheader_len == 256
-
-            #if i % 99 == 0:
-            #    print '% 5d' % i, header_type
-            #    pprint(pheader.items())
-            #    pprint(sheader.items())
 
             assert pheader['num_chans_to_follow'] <= 6
             assert pheader['num_chans_to_follow'] == 1, 'Not implemented'
             for channel in range(pheader['num_chans_to_follow']):
                 cheader_len, cheader = unwrap(data[pheader_len + sheader_len:],
-                                              """H channel_number
-                                                 H downsample_method
-                                                 f slant_range
-                                                 f ground_range
-                                                 f time_delay
-                                                 f time_duration
-                                                 f seconds_per_ping
-                                                 H processing_flags
-                                                 H frequency
-                                                 H initial_gain_code
-                                                 H gain_code
-                                                 H band_width
-                                                 I contact_number
-                                                 H contact_classification
-                                                 B conact_sub_number
-                                                 b contact_type
-                                                 I num_samples
-                                                 H millivolt_scale
-                                                 f contact_time_of_track
-                                                 B contact_close_number
-                                                 B reserved2
-                                                 f fixed_VSOP
-                                                 h weight
-                                                 4s reserved
-                                              """, 'XTFPINGCHANHEADER')
+                                              SONAR_CHANNEL_HEADER,
+                                              'XTFPINGCHANHEADER')
                 assert cheader_len == 64
                 #if i % 99 == 0:
                 #    pprint(cheader.items())
@@ -256,34 +306,10 @@ def traces_gen(data, chaninfos):
 
                 n = cheader['num_samples']
                 s = chaninfos[cheader['channel_number']]['bytes_per_sample']
-                trace = np.frombuffer(data[dstart:dstart+s*n].tobytes(),
-                                      {1: np.int8, 2: np.int16}[s])
+                raw_trace = data[dstart:dstart+s*n].tobytes()
+                trace = np.frombuffer(raw_trace, {1: np.int8, 2: np.int16}[s])
 
-                trace_header = TraceHeader(
-                    ping_date = '%04d-%02d-%02d' % (sheader['year'],
-                                                    sheader['month'],
-                                                    sheader['day']),
-                    ping_time = '%02d:%02d.%02d' % (sheader['minute'],
-                                                    sheader['second'],
-                                                    sheader['hseconds']),
-                    last_event_number = sheader['event_number'],
-                    ping_number = sheader['ping_number'],
-                    ship_speed = sheader['ship_speed'],
-                    ship_longitude = sheader['ship_xcoordinate'],
-                    ship_latitude = sheader['ship_ycoordinate'],
-                    sensor_speed = sheader['sensor_speed'],
-                    sensor_longitude = sheader['sensor_xcoordinate'],
-                    sensor_latitude = sheader['sensor_ycoordinate'],
-                    layback = sheader['layback'],
-                    cable_out = sheader['cable_out'],
-                    sensor_heading = sheader['sensor_heading'],
-                    channel_number = cheader['channel_number'],
-                    slant_range = cheader['slant_range'],
-                    time_delay = cheader['time_delay'],
-                    seconds_per_ping = cheader['seconds_per_ping'],
-                    num_samples = cheader['num_samples'])
-
-                yield trace_header, trace
+                yield Packet(pheader, sheader, cheader, trace, raw_trace)
 
         elif header_type == 'NOTES':
             nheader_len, nheader = unwrap(data[pheader_len:],
@@ -338,7 +364,7 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
 
     # strip padding from end of strings
     for i in s_indices:
-        values[i] = values[i].rstrip('\x00\r')
+        values[i] = values[i].rstrip('\x00')
 
     # run optional tests
     for i, test, action in tests:
@@ -386,36 +412,58 @@ def parse(spec):
         return _cache[spec]
 
 
-PLOT_NTRACES = 3000
-
 def read_XTF_as_grayscale_arrays(infile):
-    chaninfos, header_trace = read_XTF(infile)
-    return len(chaninfos), grayscale_arrays_gen(header_trace, chaninfos)
+    header, chaninfos, packets = read_XTF(infile)
+    return header, len(chaninfos), grayscale_arrays_gen(packets, chaninfos)
 
-def grayscale_arrays_gen(header_trace, chaninfos):
+def grayscale_arrays_gen(packets, chaninfos):
     """Iterator over channel info tuples: (number, type, trace_headers, data)
 
     data - grayscale numpy array (n_traces by trace_len)
     """
 
-    header_trace = sorted(header_trace, key=lambda (h, t): h.channel_number)
+    packets = sorted(packets, key=lambda p: p.channel_number)
 
-    for num, traces in groupby(header_trace, lambda (h, t): h.channel_number):
-        traces = list(traces)
-        headers = [h for h, t in traces]
-        traces = [t for h, t in traces]
+    for num, packets in groupby(packets, lambda p: p.channel_number):
+        packets = list(packets)
+        headers = [p.trace_header() for p in packets]
+        traces = [p.trace for p in packets]
         type = CHAN_TYPES[chaninfos[num]['type_of_channel']]
 
         r = np.vstack(traces).transpose()
         yield num, type, headers, r
 
+def copy_XTF(infile, outfile, channel_numbers):
+    channel_numbers = sorted(set(channel_numbers))
+
+    header, chaninfos, packets = read_XTF(infile)
+
+    chaninfos = [chaninfos[ch] for ch, info in enumerate(chaninfos)
+                               if ch in channel_numbers]
+
+    n_bathymetry = len([c for c in chaninfos
+                        if CHAN_TYPES[c['type_of_channel']] == 'bathymetry'])
+    header['number_of_bathymetry_channels'] = n_bathymetry
+    header['number_of_sonar_channels'] = len(chaninfos) - n_bathymetry
+
+    def packets_gen():
+        for p in packets:
+            if p.channel_number in channel_numbers:
+                p.cheader['channel_number'] = \
+                        channel_numbers.index(p.channel_number)
+                yield p
+
+    write_XTF(outfile, header, chaninfos, packets_gen())
+
+PLOT_NTRACES = 3000
+
 def main(infile):
-    chaninfos, header_trace = read_XTF(infile)
-    header_trace = sorted(header_trace, key=lambda (h, t): h.channel_number)
+    header, chaninfos, packets = read_XTF(infile)
+    packets = sorted(packets, key=lambda p: p.channel_number)
 
     channels = [0] * len(chaninfos)
-    for h, t in header_trace:
-        channels[h.channel_number] += 1
+    for p in packets:
+        channels[p.channel_number] += 1
 
     n_nonempty = len([c for c in channels if c])
 
@@ -430,10 +478,9 @@ def main(infile):
     buttons = []
 
     #first = None
-    for i, (channel, traces) in enumerate(groupby(header_trace,
-                                                  lambda (h, t):
-                                                      h.channel_number)):
-        traces = list(t for h, t in islice(traces, PLOT_NTRACES))
+    for i, (channel, packets) in enumerate(groupby(packets,
+                                                   lambda p: p.channel_number)):
+        traces = list(p.trace for p in islice(packets, PLOT_NTRACES))
         r = np.vstack(traces).transpose()
         print 'Plotting %d traces of channel %d (%.1fMb):' % \
             (min(channels[i], PLOT_NTRACES),
