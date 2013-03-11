@@ -259,7 +259,7 @@ class ChannelView(ScrollableView):
 
 
 class Project(Document):
-
+    magic = 'XTF PROJECT'
     files = None
 
     def abspaths(self):
@@ -270,9 +270,12 @@ class Project(Document):
         self.files = []
 
     def read_contents(self, file):
+        if file.next().rstrip() != self.magic:
+            raise RuntimeError('Bad project file')
         self.files = [filename.rstrip() for filename in file]
 
     def write_contents(self, file):
+        file.write(self.magic + '\n')
         self.files = [self.normpath(f) for f in self.files]
         self.files.sort()
         for f in self.files:
