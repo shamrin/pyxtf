@@ -7,7 +7,7 @@ class BadDataError(Exception):
     pass
 
 def unwrap(binary, spec, data_name=None, data_factory=dict):
-    """Unwrap `binary` according to `spec`, return (consumed_length, data)
+    r"""Unwrap `binary` according to `spec`, return (consumed_length, data)
 
     Basically it's a convenient wrapper around struct.unpack. Each non-empty
     line in spec must be: <struct format> <field name> [== <test> <action>]
@@ -18,12 +18,12 @@ def unwrap(binary, spec, data_name=None, data_factory=dict):
     <action> - what to do when test fails: `!` (bad data) or `?` (unsupported)
 
     Example:
-    >>> unwrap('\xff\xffDATA1234\x10something else', '''H magic == 0xffff !
+    >>> unwrap('\xff\x00DATA1234\x10something else', '''H magic == 0xff !
     ...                                                 4s data
     ...                                                 4x
     ...                                                 b byte''',
     ...                                              data_factory = list)
-    (11, [('magic', 65535), ('data', 'DATA'), ('byte', 16)])
+    (11, [('magic', 255), ('data', 'DATA'), ('byte', 16)])
     """
 
     struct, names, tests, s_indices = parse(spec)
@@ -49,13 +49,14 @@ def unwrap(binary, spec, data_name=None, data_factory=dict):
     return length, data_factory(zip(names, values))
 
 def wrap(data, spec):
-    """Wrap `data` dict to binary according to `spec`. Opposite of `unwrap`.
+    r"""Wrap `data` dict to binary according to `spec`. Opposite of `unwrap`.
 
     Example:
-    >>> wrap({'magic': 'x', 'data': 'DATA', 'byte': 121},'''c magic == 'x' !
-    ...                                                     4s data
-    ...                                                     b byte''')
-    'xDATAy'
+    >>> wrap({'magic': 255, 'data': 'DATA', 'num': 121},'''H magic == 0xff !
+    ...                                                    4s data
+    ...                                                    2x
+    ...                                                    b num''')
+    '\xff\x00DATA\x00\x00y'
     """
 
     struct, names, tests, s_indices = parse(spec)
