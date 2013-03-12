@@ -3,10 +3,34 @@
 from struct import Struct
 import re
 
+class Sacker(object):
+    r"""
+    >>> sacker = Sacker('>', '''H magic
+    ...                         4s data
+    ...                         b byte''')
+    >>> sacker.unwrap('\x00\xffDATA\x01', list)[1]
+    [('magic', 255), ('data', 'DATA'), ('byte', 1)]
+    >>> sacker.wrap({'magic': 255, 'data': 'DATA', 'byte': 1})
+    '\x00\xffDATA\x01'
+    """
+
+    def __init__(self, endian, spec, name = None, length = None):
+        if length is not None:
+            assert parse(spec, endian)[0].size == length
+        self.endian = endian
+        self.spec = spec
+        self.name = name
+
+    def unwrap(self, binary, data_factory = dict):
+        return unwrap(binary, self.spec, self.name, data_factory, self.endian)
+
+    def wrap(self, data):
+        return wrap(data, self.spec, self.endian)
+
 class BadDataError(Exception):
     pass
 
-def unwrap(binary, spec, data_name=None, data_factory=dict):
+def unwrap(binary, spec, data_name = None, data_factory = dict, endian = '<'):
     r"""Unwrap `binary` according to `spec`, return (consumed_length, data)
 
     Basically it's a convenient wrapper around struct.unpack. Each non-empty
@@ -27,7 +51,7 @@ def unwrap(binary, spec, data_name=None, data_factory=dict):
     (11, [('magic', 255), ('data', 'DATA'), ('byte', 16)])
     """
 
-    struct, names, tests, s_indices = parse(spec)
+    struct, names, tests, s_indices = parse(spec, endian)
 
     # unpack binary data
     length = struct.size
@@ -49,7 +73,7 @@ def unwrap(binary, spec, data_name=None, data_factory=dict):
 
     return length, data_factory(zip(names, values))
 
-def wrap(data, spec):
+def wrap(data, spec, endian = '<'):
     r"""Wrap `data` dict to binary according to `spec`. Opposite of `unwrap`.
 
     Example:
@@ -60,7 +84,7 @@ def wrap(data, spec):
     'DATAy\x00\x00'
     """
 
-    struct, names, tests, s_indices = parse(spec)
+    struct, names, tests, s_indices = parse(spec, endian)
     return struct.pack(*[data.get(name, 0) for name in names])
 
 def strip(s):
@@ -71,9 +95,9 @@ def strip(s):
     return s.strip()
 
 _cache = {}
-def parse(spec):
+def parse(spec, endian):
     try:
-        return _cache[spec]
+        return _cache[endian, spec]
     except KeyError:
         matches = [re.match("""(?P<format>\w+)
                                (
@@ -103,10 +127,10 @@ def parse(spec):
         s_indices = [i for i, c in enumerate(formats)
                        if re.match(r'(\d+)s', c)]
 
-        struct = Struct('<' + ''.join(m.group('format') for m in matches))
+        struct = Struct(endian + ''.join(m.group('format') for m in matches))
 
-        _cache[spec] = struct, names, tests, s_indices
-        return _cache[spec]
+        _cache[endian, spec] = struct, names, tests, s_indices
+        return _cache[endian, spec]
 
 if __name__ == '__main__':
     import doctest
