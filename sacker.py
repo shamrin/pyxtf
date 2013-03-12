@@ -54,13 +54,13 @@ def wrap(data, spec):
     Example:
     >>> wrap({'magic': 255, 'data': 'DATA', 'num': 121},'''H magic == 0xff !
     ...                                                    4s data
-    ...                                                    2x
-    ...                                                    b num''')
-    '\xff\x00DATA\x00\x00y'
+    ...                                                    b num
+    ...                                                    h optional''')
+    '\xff\x00DATAy\x00\x00'
     """
 
     struct, names, tests, s_indices = parse(spec)
-    return struct.pack(*[data[name] for name in names])
+    return struct.pack(*[data.get(name, 0) for name in names])
 
 _cache = {}
 def parse(spec):
