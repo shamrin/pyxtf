@@ -109,7 +109,8 @@ class ProjectWindow(Window):
                                              ['channel %d' % (c+1),
                                               self.xtf_file.types.get(c),
                                               'traces: %d' % n] if w),
-                                   enabled = n > 0, value = n > 0)
+                                   enabled = n > 0, value = n > 0,
+                                   action = 'select_channel')
                           for c, n in enumerate(self.xtf_file.ntraces)]
                 button = Button('Save to XTF...', action = 'save_xtf_cmd')
                 panel.place_column(checks + [button], top = 10, left = 10)
@@ -117,6 +118,7 @@ class ProjectWindow(Window):
                 self.place(panel, top = 0, bottom = 0, right = 0,
                            sticky = 'nse')
                 self.checkboxes = checks
+                self.save_xtf_btn = button
 
                 file_view = FileView(self.xtf_file)
                 self.place(file_view, top = 0, bottom = 0, left = 0,
@@ -131,6 +133,9 @@ class ProjectWindow(Window):
         # make sure .setup_menus() gets called
         # (it usually does, except after toggle-some-control-then-change-file)
         self.become_target()
+
+    def select_channel(self):
+        self.save_xtf_btn.enabled = any(cb.value for cb in self.checkboxes)
 
     def update_title(self):
         doc = self.document
