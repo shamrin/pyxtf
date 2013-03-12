@@ -18,7 +18,8 @@ def unwrap(binary, spec, data_name=None, data_factory=dict):
     <action> - what to do when test fails: `!` (bad data) or `?` (unsupported)
 
     Example:
-    >>> unwrap('\xff\x00DATA1234\x10something else', '''H magic == 0xff !
+    >>> unwrap('\xff\x00DATA1234\x10something else', '''# comment
+    ...                                                 H magic == 0xff !
     ...                                                 4s data
     ...                                                 4x
     ...                                                 b byte''',
@@ -52,15 +53,22 @@ def wrap(data, spec):
     r"""Wrap `data` dict to binary according to `spec`. Opposite of `unwrap`.
 
     Example:
-    >>> wrap({'magic': 255, 'data': 'DATA', 'num': 121},'''H magic == 0xff !
-    ...                                                    4s data
-    ...                                                    b num
-    ...                                                    h optional''')
-    '\xff\x00DATAy\x00\x00'
+    >>> wrap({'data': 'DATA', 'num': 121},'''4s data
+    ...                                      b num
+    ...                                      h opt    # missing data means 0
+    ...                                   ''')
+    'DATAy\x00\x00'
     """
 
     struct, names, tests, s_indices = parse(spec)
     return struct.pack(*[data.get(name, 0) for name in names])
+
+def strip(s):
+    try:
+        s = s[:s.index('#')]
+    except ValueError:
+        pass
+    return s.strip()
 
 _cache = {}
 def parse(spec):
@@ -75,8 +83,8 @@ def parse(spec):
                                  (==\s*(?P<test>.+)
                                     \ (?P<action>[!?]))?
                                )?
-                               $""", s.strip(), re.VERBOSE)
-                   for s in spec.split('\n') if s and not s.isspace()]
+                               $""", strip(s), re.VERBOSE)
+                   for s in spec.split('\n') if strip(s)]
 
         for n, m in enumerate(matches):
             if not m:
