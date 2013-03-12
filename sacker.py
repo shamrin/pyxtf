@@ -4,21 +4,24 @@ import re
 class BadDataError(Exception):
     pass
 
-def unwrap(binary, spec, data_name=None, dict_factory=dict):
+def unwrap(binary, spec, data_name=None, data_factory=dict):
     """Unwrap `binary` according to `spec`, return (consumed_length, data)
 
     Basically it's a convenient wrapper around struct.unpack. Each non-empty
     line in spec must be: <struct format> <field name> [== <test> <action>]
 
-    struct format - struct module format producing exactly one value
-    field name - dictionary key to put unpacked value into
-    test - optional test an unpacked value be equal to
-    action - what to do if test failed: `!` (bad data) or `?` (unsupported)
+    <struct format> - struct format producing one value (except for 'x' format)
+    <field name> - dictionary key to put unpacked value into
+    <test> - optional test an unpacked value be equal to
+    <action> - what to do when test fails: `!` (bad data) or `?` (unsupported)
 
     Example:
-    >>> unwrap('\x0a\x00DATA\x00something else', '''h magic == 0x0a !
-    ...                                             4s data''')
-    (6, {'magic': 10, 'data': 'DATA'})
+    >>> unwrap('\xff\xffDATA1234\x10something else', '''H magic == 0xffff !
+    ...                                                 4s data
+    ...                                                 4x
+    ...                                                 b byte''',
+    ...                                              data_factory = list)
+    (11, [('magic', 65535), ('data', 'DATA'), ('byte', 16)])
     """
 
     struct, names, tests, s_indices = parse(spec)
@@ -41,7 +44,7 @@ def unwrap(binary, spec, data_name=None, dict_factory=dict):
             raise BadDataError(' '.join(w for w in
                     [adj, data_name, names[i], '== %r' % values[i]] if w))
 
-    return length, dict_factory(zip(names, values))
+    return length, data_factory(zip(names, values))
 
 def wrap(data, spec):
     struct, names, tests, s_indices = parse(spec)
@@ -52,21 +55,27 @@ def parse(spec):
     try:
         return _cache[spec]
     except KeyError:
-        matches = [re.match("""(\w+)           # struct format
-                               \s+
-                               (\w+)           # field name
-                               \s*
-                               (==\s*(.+)\ ([!?]))? # optional test-action
+        matches = [re.match("""(?P<format>\w+)
+                               (
+                                 \s+
+                                 (?P<name>\w+)
+                                 \s*
+                                 (==\s*(?P<test>.+)
+                                    \ (?P<action>[!?]))?
+                               )?
                                $""", s.strip(), re.VERBOSE)
                    for s in spec.split('\n') if s and not s.isspace()]
 
         for n, m in enumerate(matches):
-            if not m: raise SyntaxError('Bad unwrap spec, LINE %d' % (n+1))
+            if not m:
+                raise SyntaxError('Bad spec, LINE %d' % (n+1))
+            if not (m.group('name') or re.match('(\d+)x', m.group('format'))):
+                raise SyntaxError('Bad spec, name required, LINE %d' % (n+1))
 
-        formats = [m.group(1) for m in matches]
-        names = [m.group(2) for m in matches]
+        formats = [m.group('format') for m in matches if m.group('name')]
+        names = [m.group('name') for m in matches if m.group('name')]
 
-        tests = [(m.group(4), m.group(5)) for m in matches]
+        tests = [(m.group('test'), m.group('action')) for m in matches]
         tests = [(i, eval(test, {}), action)
                  for i, (test, action) in enumerate(tests) if test]
 
@@ -74,8 +83,11 @@ def parse(spec):
         s_indices = [i for i, c in enumerate(formats)
                        if re.match(r'(\d+)s', c)]
 
-        struct = Struct('<' + ''.join(formats))
+        struct = Struct('<' + ''.join(m.group('format') for m in matches))
 
         _cache[spec] = struct, names, tests, s_indices
         return _cache[spec]
 
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
