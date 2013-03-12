@@ -196,8 +196,9 @@ class XTFFile(object):
         self.filename = filename
 
         header, nchannels, arrays = xtf.read_XTF_as_grayscale_arrays(filename)
-        print '\n'.join('%s: %r' % (k.replace('_', ' '), v)
-                        for k, v in header.items())
+        print 'File %r, header:' % (filename,)
+        print '  ' + '\n  '.join('%s: %r' % (k.replace('_', ' '), v)
+                                 for k, v in header.items())
 
         self.headers = []
         self.channels = []
