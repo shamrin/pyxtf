@@ -302,8 +302,8 @@ def packets_gen(data, chaninfos, packet_filter):
 
         if packet_filter == '*' or type == packet_filter.lower():
             if type == 'sonar':
-                sheader_len, sheader = unwrap(data[pheader_len:], SONAR_HEADER,
-                                                                  'XTFPINGHEADER')
+                sheader_len, sheader = unwrap(data[pheader_len:],
+                                              SONAR_HEADER, 'XTFPINGHEADER')
                 assert pheader_len + sheader_len == 256
 
                 assert pheader['num_chans_to_follow'] <= 6
