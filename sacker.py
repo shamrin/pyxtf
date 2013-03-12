@@ -1,3 +1,5 @@
+"""sacker - convenient wrappers around struct.pack and struct.unpack"""
+
 from struct import Struct
 import re
 
@@ -47,6 +49,15 @@ def unwrap(binary, spec, data_name=None, data_factory=dict):
     return length, data_factory(zip(names, values))
 
 def wrap(data, spec):
+    """Wrap `data` dict to binary according to `spec`. Opposite of `unwrap`.
+
+    Example:
+    >>> wrap({'magic': 'x', 'data': 'DATA', 'byte': 121},'''c magic == 'x' !
+    ...                                                     4s data
+    ...                                                     b byte''')
+    'xDATAy'
+    """
+
     struct, names, tests, s_indices = parse(spec)
     return struct.pack(*[data[name] for name in names])
 
