@@ -82,6 +82,10 @@ class ProjectWindow(Window):
         numbers = [i for i, cb in enumerate(self.checkboxes) if cb.value]
         self.xtf_file.save_xtf(numbers)
 
+    def save_segy_cmd(self):
+        numbers = [i for i, cb in enumerate(self.checkboxes) if cb.value]
+        self.xtf_file.save_segy(numbers)
+
     def project_changed(self, model, recent_filename = None):
         doc = self.document
         self.menus = app_menu([f.replace('/', '\\')
@@ -110,15 +114,21 @@ class ProjectWindow(Window):
                                               self.xtf_file.types.get(c),
                                               'traces: %d' % n] if w),
                                    enabled = n > 0, value = n > 0,
-                                   action = 'select_channel')
+                                   action = 'setup_buttons')
                           for c, n in enumerate(self.xtf_file.ntraces)]
-                button = Button('Save to XTF...', action = 'save_xtf_cmd')
-                panel.place_column(checks + [button], top = 10, left = 10)
+                xtf_btn = Button('Save to XTF...', action = 'save_xtf_cmd')
+                segy_btn = Button('Save to SEG-Y...', action = 'save_segy_cmd')
+                xtf_btn.width = segy_btn.width = \
+                        max(xtf_btn.width, segy_btn.width)
+                panel.place_column(checks + [xtf_btn, segy_btn], top = 10,
+                                                                 left = 10)
                 panel.shrink_wrap(padding = (40, 40))
                 self.place(panel, top = 0, bottom = 0, right = 0,
                            sticky = 'nse')
                 self.checkboxes = checks
-                self.save_xtf_btn = button
+                self.xtf_btn = xtf_btn
+                self.segy_btn = segy_btn
+                self.setup_buttons()
 
                 file_view = FileView(self.xtf_file)
                 self.place(file_view, top = 0, bottom = 0, left = 0,
@@ -134,8 +144,10 @@ class ProjectWindow(Window):
         # (it usually does, except after toggle-some-control-then-change-file)
         self.become_target()
 
-    def select_channel(self):
-        self.save_xtf_btn.enabled = any(cb.value for cb in self.checkboxes)
+    def setup_buttons(self):
+        self.xtf_btn.enabled = any(cb.value for cb in self.checkboxes)
+        self.segy_btn.enabled = \
+                len([cb.value for cb in self.checkboxes if cb.value]) == 1
 
     def update_title(self):
         doc = self.document
@@ -222,6 +234,7 @@ class XTFFile(object):
 
     csv_type = FileType(name = 'CSV file', suffix = 'csv')
     xtf_type = FileType(name = 'XTF file', suffix = 'xtf')
+    segy_type = FileType(name = 'SEG-Y file', suffix = 'seg')
 
     def export_csv(self):
         ref = request_new_file('Export CSV file', file_type = self.csv_type)
@@ -237,6 +250,12 @@ class XTFFile(object):
         if ref is not None:
             xtf.copy_XTF(self.filename, os.path.join(ref.dir.path, ref.name),
                          channel_numbers)
+
+    def save_segy(self, channel_numbers):
+        ref = request_new_file('Save SEG-Y file', file_type = self.segy_type)
+        if ref is not None:
+            xtf.export_SEGY(self.filename, os.path.join(ref.dir.path, ref.name),
+                            channel_numbers)
 
 
 class FileView(Frame):
