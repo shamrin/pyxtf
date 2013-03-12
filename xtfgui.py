@@ -1,3 +1,5 @@
+"""XTF viewer (and converter)"""
+
 import os
 import csv
 

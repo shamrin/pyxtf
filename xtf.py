@@ -1,6 +1,6 @@
 """xtf.py - read and show eXtended Triton Format (XTF) files
 
-Usage:
+From command line (requires Matplotlib):
     python xtf.py <path-to-xtf-file>
 """
 
