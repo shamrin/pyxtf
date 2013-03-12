@@ -108,11 +108,15 @@ def read_XTF(infile):
     pstart = HEADER_LEN
     return header, chaninfos, packets_gen(file_data[pstart:], chaninfos)
 
+def pad(s, width):
+    assert len(s) <= width
+    return s.ljust(width, '\x00')
+
 def write_XTF(outfile, header, chaninfos, packets):
     with open(outfile, 'wb') as out:
         header_parts = [wrap(header, HEADER)]
         header_parts.extend(wrap(chaninfo, CHANINFO) for chaninfo in chaninfos)
-        out.write(''.join(header_parts).ljust(HEADER_LEN, '\x00'))
+        out.write(pad(''.join(header_parts), HEADER_LEN))
 
         for p in packets:
             packet_parts = [
@@ -121,7 +125,7 @@ def write_XTF(outfile, header, chaninfos, packets):
                 wrap(p.cheader, SONAR_CHANNEL_HEADER),
                 p.raw_trace]
             packet_len = p.pheader['num_bytes_this_record']
-            out.write(''.join(packet_parts).ljust(packet_len, '\x00'))
+            out.write(pad(''.join(packet_parts), packet_len))
 
 TraceHeader = namedtuple('TraceHeader', '''channel_number
     ping_date ping_time last_event_number ping_number
