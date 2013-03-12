@@ -82,7 +82,7 @@ class ProjectWindow(Window):
         numbers = [i for i, cb in enumerate(self.checkboxes) if cb.value]
         self.xtf_file.save_xtf(numbers)
 
-    def project_changed(self, model):
+    def project_changed(self, model, recent_filename = None):
         doc = self.document
         self.menus = app_menu([f.replace('/', '\\')
                                for f in sorted(doc.files)])
@@ -93,6 +93,8 @@ class ProjectWindow(Window):
         if doc.files:
             if self.current_file is None:
                 self.current_file = 0
+            if recent_filename is not None:
+                self.current_file = doc.files.index(recent_filename)
 
             filename = doc.abspaths()[self.current_file]
             try:
@@ -297,7 +299,7 @@ class Project(Document):
         self.files.sort()
         for f in self.files:
             file.write(f + '\n')
-        self.notify_windows()
+        self.notify_windows('project_changed')
 
     def normpath(self, p):
         if self.file:
@@ -313,11 +315,11 @@ class Project(Document):
                 self.files.append(f)
                 self.changed()
         self.files.sort()
-        self.notify_windows()
+        self.notify_windows('project_changed', self.normpath(filenames[0]))
 
-    def notify_windows(self):
+    def notify_windows(self, *event):
         for window in self.windows:
-            window.project_changed(self)
+            getattr(window, event[0])(self, *event[1:])
 
 
 XTFApp().run()
