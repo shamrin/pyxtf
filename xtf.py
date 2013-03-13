@@ -95,7 +95,7 @@ CHANINFO = """
 
 def read_XTF(infile, packet_filter):
     file_data = memoryview(open(infile, 'rb').read())
-    header_len, header = unwrap(file_data, HEADER, dict_factory=OrderedDict)
+    header_len, header = unwrap(file_data, HEADER, data_factory=OrderedDict)
     nchannels = (header['number_of_sonar_channels'] +
                  header['number_of_bathymetry_channels'])
     assert nchannels <= 6
