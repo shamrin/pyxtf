@@ -4,8 +4,8 @@ import os
 import csv
 
 import numpy
-from GUI import Application, ScrollableView, Document, Window, Button, rgb
-from GUI import Image, Frame, Font, Model, Label, Menu, Row, CheckBox
+from GUI import Application, ScrollableView, Document, Window, Globals, rgb
+from GUI import Image, Frame, Font, Model, Label, Menu, Row, CheckBox, Button
 from GUI.Files import FileType
 from GUI.FileDialogs import request_old_files, request_new_file
 from GUI.Geometry import (pt_in_rect, offset_rect, rects_intersect,
@@ -55,6 +55,13 @@ class ProjectWindow(Window):
         self.current_file = None
         Window.__init__(self, size = (500, 400), document = document)
         self.project_changed(document)
+
+    def close_cmd(self):
+        Window.close_cmd(self)
+        app = Globals._application
+        if not app.windows:
+            # force close: the remaining console window stops app from quiting
+            app._quit()
 
     def setup_menus(self, m):
         Window.setup_menus(self, m)
