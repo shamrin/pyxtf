@@ -104,8 +104,7 @@ def parse(spec, endian):
                                  \s+
                                  (?P<name>\w+)
                                  \s*
-                                 (==\s*(?P<test>.+)
-                                    \ (?P<action>[!?]))?
+                                 ( == \s* (?P<test>.+) \ (?P<action>[!?]) )?
                                )?
                                $""", strip(s), re.VERBOSE)
                    for s in spec.split('\n') if strip(s)]
