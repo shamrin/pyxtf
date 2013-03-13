@@ -7,12 +7,14 @@ From command line (requires Matplotlib):
 import sys
 from pprint import pprint, pformat
 from collections import OrderedDict, namedtuple
-from itertools import groupby, islice
+from itertools import groupby, islice, chain
 
 import numpy as np
 
 from sacker import wrap, unwrap, BadDataError
 import segy
+
+# XTF spec: http://www.tritonimaginginc.com/site/content/public/downloads/FileFormatInfo/Xtf%20File%20Format_X35.pdf
 
 CHAN_TYPES = {
     0: 'subbottom',
@@ -95,7 +97,7 @@ CHANINFO = """
 
 def read_XTF(infile, packet_filter):
     file_data = memoryview(open(infile, 'rb').read())
-    header_len, header = unwrap(file_data, HEADER, data_factory=OrderedDict)
+    header_len, header = unwrap(file_data, HEADER, data_factory = OrderedDict)
     nchannels = (header['number_of_sonar_channels'] +
                  header['number_of_bathymetry_channels'])
     assert nchannels <= 6
@@ -276,7 +278,7 @@ SONAR_CHANNEL_HEADER = """
     H band_width
     I contact_number
     H contact_classification
-    B conact_sub_number
+    B contact_sub_number
     b contact_type
     I num_samples
     H millivolt_scale
@@ -369,10 +371,9 @@ def grayscale_arrays_gen(packets, chaninfos):
         yield num, type, headers, r
 
 def copy_XTF(infile, outfile, channel_numbers):
-    channel_numbers = sorted(set(channel_numbers))
-
     header, chaninfos, packets = read_XTF(infile, '*')
 
+    channel_numbers = sorted(set(channel_numbers))
     chaninfos = [chaninfos[ch] for ch, info in enumerate(chaninfos)
                                if ch in channel_numbers]
 
@@ -392,6 +393,77 @@ def copy_XTF(infile, outfile, channel_numbers):
                 yield p
 
     write_XTF(outfile, header, chaninfos, packets_gen())
+
+def export_SEGY(infile, outfile, (channel_number,)):
+    header, chaninfos, packets = read_XTF(infile, 'sonar')
+    chaninfo = chaninfos[channel_number]
+
+    packets = (p for p in packets if p.channel_number == channel_number)
+
+    # peek first packet, and keep generator intact
+    p0 = packets.next()
+    packets = chain([p0], packets)
+
+    sample_interval = int(round(p0.cheader['time_duration'] /
+                                p0.cheader['num_samples'] * 10**6))
+    sample_format = {1: 'b', 2: 'h'}[ chaninfo['bytes_per_sample'] ]
+
+    segy_header = dict(
+        n_traces_per_ensemble = 1,
+        n_auxtraces_per_ensemble = 0,
+        sample_interval = sample_interval,
+        n_trace_samples = p0.cheader['num_samples'],
+        sample_format = segy.SAMPLE_FORMATS[sample_format],
+        segy_rev = 0x0100,
+        fixed_length_trace_flag = 1,
+        n_extended_headers = 0,
+        measurement_system = 1, # meters
+        ensemble_fold = 1, # that's what Chesapeake XTF-To-SEGY is doing
+    )
+
+    def d2s(deg, scale):
+        """Convert degrees to (scaled) seconds of arc"""
+        return int(round(deg * 60 * 60 * scale))
+
+    def traces():
+        for i, p in enumerate(packets):
+
+            # make sure we don't have variable trace len or sample interval
+            assert p.cheader['num_samples'] == p0.cheader['num_samples']
+            assert p.cheader['time_duration'] == p0.cheader['time_duration']
+
+            trace_header = dict(
+                # ignoring p.sheader['ping_number'], it counts 1 3 5 7...
+                trace_seq_in_line = i + 1,
+                trace_seq_in_file = i + 1,
+                trace_id_code = 1, # seismic
+
+                year = p.sheader['year'],
+                day_of_year = p.sheader['julian_day'],
+                hour = p.sheader['hour'],
+                minute = p.sheader['minute'],
+                second = p.sheader['second'],
+
+                time_basis_code = 4,
+                n_samples = p.cheader['num_samples'],
+                sample_interval = sample_interval,
+                elevations_scaler = 1,
+
+                coordinate_units = 2, # secs of arc
+                coordinates_scaler = -100,
+
+                reciever_coord_x = d2s(p.sheader['sensor_xcoordinate'], 100),
+                reciever_coord_y = d2s(p.sheader['sensor_ycoordinate'], 100),
+
+                # Chesapeake XTF-To-SEGY does this, but I think it's wrong
+                #source_coord_x = d2s(p.sheader['ship_xcoordinate'], 100),
+                #source_coord_y = d2s(p.sheader['ship_ycoordinate'], 100),
+
+                #ensemble_num = ... # For marks when importing to Geographix
+            )
+            yield trace_header, p.trace
+
+    segy.write_SEGY(outfile, segy_header, 'Test header', traces())
 
 PLOT_NTRACES = 3000
 
