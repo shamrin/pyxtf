@@ -318,12 +318,12 @@ class Project(Document):
     def read_contents(self, file):
         if file.next().rstrip() != self.magic:
             raise RuntimeError('Bad project file')
-        self.files = [filename.rstrip() for filename in file]
+        files = [filename.rstrip() for filename in file]
+        self.files = sorted(self.normpath(filename) for filename in files)
 
     def write_contents(self, file):
         file.write(self.magic + '\n')
-        self.files = [self.normpath(f) for f in self.files]
-        self.files.sort()
+        self.files = sorted(self.normpath(f) for f in self.files)
         for f in self.files:
             file.write(f + '\n')
         self.notify_windows('project_changed')
