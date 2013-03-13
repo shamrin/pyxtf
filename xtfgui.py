@@ -94,6 +94,7 @@ class ProjectWindow(Window):
 
         for c in list(self.contents):
             self.remove(c)
+            c.destroy()
 
         if doc.files:
             if self.current_file is None:
