@@ -5,7 +5,7 @@ import csv
 
 import numpy
 from GUI import Application, ScrollableView, Document, Window, Button, rgb
-from GUI import Image, Frame, Font, Model, Label, Menu, Column, CheckBox
+from GUI import Image, Frame, Font, Model, Label, Menu, Row, CheckBox
 from GUI.Files import FileType
 from GUI.FileDialogs import request_old_files, request_new_file
 from GUI.Geometry import (pt_in_rect, offset_rect, rects_intersect,
@@ -120,9 +120,11 @@ class ProjectWindow(Window):
                 segy_btn = Button('Save to SEG-Y...', action = 'save_segy_cmd')
                 xtf_btn.width = segy_btn.width = \
                         max(xtf_btn.width, segy_btn.width)
-                panel.place_column(checks + [xtf_btn, segy_btn], top = 10,
+                segy_row = Row([segy_btn,
+                                Label('select single\nchannel to enable')])
+                panel.place_column(checks + [xtf_btn, segy_row], top = 10,
                                                                  left = 10)
-                panel.shrink_wrap(padding = (40, 40))
+                panel.shrink_wrap(padding = (20, 20))
                 self.place(panel, top = 0, bottom = 0, right = 0,
                            sticky = 'nse')
                 self.checkboxes = checks
