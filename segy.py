@@ -3,6 +3,10 @@
 From command line:
     python segy.py <path-to-segy-file>
 """
+
+from collections import OrderedDict
+from pprint import pprint
+
 import numpy as np
 
 from sacker import Sacker
@@ -155,9 +159,6 @@ def write_SEGY(outfile, file_header, text, traces):
             out.write(np.getbuffer(data.byteswap()))
 
 def read_SEGY(infile):
-    from collections import OrderedDict
-    from pprint import pprint
-    import numpy as np
     file_data = memoryview(open(infile, 'rb').read())
     #print decode_text(file_data[:TEXT_LEN])
     data = file_data[TEXT_LEN:]
