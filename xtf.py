@@ -534,7 +534,12 @@ def main(infile):
 
     P.show()
 
+def test_copy(infile):
+    copy_XTF(infile, infile+'_test_ch1.xtf', [1])
+    export_SEGY(infile, infile+'_test_ch0.segy', [0])
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         sys.exit('Error: wrong arguments\n' + __doc__.rstrip())
     main(*sys.argv[1:])
+    #test_copy(*sys.argv[1:])
