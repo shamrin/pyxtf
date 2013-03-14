@@ -6,7 +6,7 @@ import webbrowser
 
 import numpy
 from GUI import Application, ScrollableView, Document, Window, Globals, rgb
-from GUI import Image, Frame, Font, Model, Label, Menu, Row, CheckBox, Button
+from GUI import Image, Frame, Font, Model, Label, Menu, Grid, CheckBox, Button
 from GUI import BaseAlert
 from GUI.Files import FileType
 from GUI.FileDialogs import request_old_files, request_new_file
@@ -95,11 +95,11 @@ class ProjectWindow(Window):
     def export_csv_cmd(self):
         self.xtf_file.export_csv()
 
-    def save_xtf_cmd(self):
+    def xtf_cmd(self):
         numbers = [i for i, cb in enumerate(self.checkboxes) if cb.value]
         self.xtf_file.save_xtf(numbers)
 
-    def save_segy_cmd(self):
+    def segy_cmd(self):
         numbers = [i for i, cb in enumerate(self.checkboxes) if cb.value]
         self.xtf_file.save_segy(numbers)
 
@@ -134,20 +134,28 @@ class ProjectWindow(Window):
                                    enabled = n > 0, value = n > 0,
                                    action = 'setup_buttons')
                           for c, n in enumerate(self.xtf_file.ntraces)]
-                xtf_btn = Button('Save to XTF...', action = 'save_xtf_cmd')
-                segy_btn = Button('Save to SEG-Y...', action = 'save_segy_cmd')
+                xtf_btn = Button('Save to XTF...', action = 'xtf_cmd')
+                xtf_btn2 = Button('Save all to XTF...', action = 'xtf_all_cmd')
+                segy_btn = Button('Save to SEG-Y...', action = 'segy_cmd')
+                segy_btn2 = Button('Save all to SEG-Y...',
+                                                     action = 'segy_all_cmd')
                 xtf_btn.width = segy_btn.width = \
                         max(xtf_btn.width, segy_btn.width)
-                segy_row = Row([segy_btn,
-                                Label('select single\nchannel to enable')])
-                panel.place_column(checks + [xtf_btn, segy_row], top = 10,
-                                                                 left = 10)
+                xtf_btn2.width = segy_btn2.width = \
+                        max(xtf_btn2.width, segy_btn2.width)
+                buttons = Grid([[xtf_btn, xtf_btn2], [segy_btn, segy_btn2]],
+                               row_spacing = 10)
+                self.label = Label(width = buttons.width)
+                panel.place_column(checks + [buttons], top = 10, left = 10)
+                panel.place(self.label, top = buttons+3, left = 20)
                 panel.shrink_wrap(padding = (20, 20))
                 self.place(panel, top = 0, bottom = 0, right = 0,
                            sticky = 'nse')
                 self.checkboxes = checks
                 self.xtf_btn = xtf_btn
+                self.xtf_all_btn = xtf_btn2
                 self.segy_btn = segy_btn
+                self.segy_all_btn = segy_btn2
                 self.setup_buttons()
 
                 file_view = FileView(self.xtf_file)
@@ -165,9 +173,14 @@ class ProjectWindow(Window):
         self.become_target()
 
     def setup_buttons(self):
-        self.xtf_btn.enabled = any(cb.value for cb in self.checkboxes)
-        self.segy_btn.enabled = \
+        self.xtf_btn.enabled = self.xtf_all_btn.enabled = \
+                any(cb.value for cb in self.checkboxes)
+        self.segy_btn.enabled = self.segy_all_btn.enabled = \
                 len([cb.value for cb in self.checkboxes if cb.value]) == 1
+        if self.segy_btn.enabled:
+            self.label.text = ''
+        else:
+            self.label.text = '(select exactly one channel to enable SEG-Y)'
 
     def update_title(self):
         doc = self.document
