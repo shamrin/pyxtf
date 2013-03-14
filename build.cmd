@@ -3,5 +3,6 @@ del /s /q dist
 c:\Python27\python setup.py py2exe
 del /q wix\XTF_Surveyor.msi
 cd wix
-build_msi.cmd
+call build_msi.cmd
 cd ..
+c:\Python27\python rename_msi.py
