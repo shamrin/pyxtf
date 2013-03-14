@@ -14,6 +14,7 @@ from GUI.StdColors import black, red, light_grey, white
 from GUI.StdFonts import system_font
 from GUI.StdMenus import basic_menus, edit_cmds, pref_cmds, print_cmds
 from GUI.Numerical import image_from_ndarray
+from GUI.Alerts import note_alert
 
 import xtf
 
@@ -34,8 +35,8 @@ def app_menu(profiles = None):
 
 class XTFApp(Application):
 
-    def __init__(self):
-        Application.__init__(self)
+    def __init__(self, **kw):
+        Application.__init__(self, **kw)
         self.proj_type = FileType(name = "XTF Project", suffix = "project")
         self.file_type = self.proj_type
         self.menus = []
@@ -48,6 +49,10 @@ class XTFApp(Application):
 
     def make_window(self, document):
         ProjectWindow(document).show()
+
+    def about_cmd(self):
+        from version import __version__
+        note_alert('%s version %s' % (Globals.application_name, __version__))
 
 
 class ProjectWindow(Window):
@@ -65,6 +70,7 @@ class ProjectWindow(Window):
 
     def setup_menus(self, m):
         Window.setup_menus(self, m)
+        m.about_cmd.enabled = True
         m.import_cmd.enabled = True
         if self.current_file is not None:
             m.export_csv_cmd.enabled = True
@@ -357,4 +363,4 @@ class Project(Document):
             getattr(window, event[0])(self, *event[1:])
 
 
-XTFApp().run()
+XTFApp(title = 'XTF Surveyor').run()
