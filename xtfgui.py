@@ -2,10 +2,12 @@
 
 import os
 import csv
+import webbrowser
 
 import numpy
 from GUI import Application, ScrollableView, Document, Window, Globals, rgb
 from GUI import Image, Frame, Font, Model, Label, Menu, Row, CheckBox, Button
+from GUI import BaseAlert
 from GUI.Files import FileType
 from GUI.FileDialogs import request_old_files, request_new_file
 from GUI.Geometry import (pt_in_rect, offset_rect, rects_intersect,
@@ -13,8 +15,9 @@ from GUI.Geometry import (pt_in_rect, offset_rect, rects_intersect,
 from GUI.StdColors import black, red, light_grey, white
 from GUI.StdFonts import system_font
 from GUI.StdMenus import basic_menus, edit_cmds, pref_cmds, print_cmds
+from GUI.StdButtons import DefaultButton
 from GUI.Numerical import image_from_ndarray
-from GUI.Alerts import note_alert
+from GUI.BaseAlertFunctions import present_and_destroy
 
 import xtf
 
@@ -51,8 +54,7 @@ class XTFApp(Application):
         ProjectWindow(document).show()
 
     def about_cmd(self):
-        from version import __version__
-        note_alert('%s version %s' % (Globals.application_name, __version__))
+        present_and_destroy(AboutBox())
 
 
 class ProjectWindow(Window):
@@ -362,5 +364,30 @@ class Project(Document):
         for window in self.windows:
             getattr(window, event[0])(self, *event[1:])
 
+
+class AboutBox(BaseAlert):
+    url = 'https://github.com/shamrin/pyxtf'
+
+    def __init__(self):
+        from version import __version__ as ver
+        BaseAlert.__init__(self, 'note', '%s, version %s\n\n%s' %
+                                    (Globals.application_name, ver, self.url),
+                                 button_labels = ['OK', 'Visit home page'])
+
+    def _create_buttons(self, ok_label, home_label):
+        self.yes_button = DefaultButton(title = ok_label, action = self.yes)
+        self.home_button = Button(title = home_label, action = self.home)
+
+    def _layout_buttons(self):
+        self.place(self.yes_button,
+                   right = self.label.right,
+                   top = self.label + self._label_button_spacing)
+        self.place(self.home_button,
+                   left = self.label.left,
+                   top = self.label + self._label_button_spacing)
+
+    def home(self):
+        webbrowser.open(self.url)
+        self.yes()
 
 XTFApp(title = 'XTF Surveyor').run()
