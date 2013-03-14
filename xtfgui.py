@@ -82,7 +82,8 @@ class ProjectWindow(Window):
             m.profiles_cmd[self.current_file].checked = True
 
     def import_cmd(self):
-        refs = request_old_files('Import XTF files')
+        refs = request_old_files('Import XTF files',
+                                 file_types = [XTFFile.xtf_type])
         if refs is not None:
             self.document.add_files([os.path.join(r.dir.path, r.name)
                                      for r in refs])
