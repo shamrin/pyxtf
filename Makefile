@@ -7,6 +7,7 @@ NPWIN = numpy-1.7.0-win32-superpack-python2.7.exe
 PY2EXE = py2exe-0.6.9.win32-py2.7.exe
 PYGUI = PyGUI-2.5.3.tar.gz
 WIN32 = pywin32-218.win32-py2.7.exe
+PROJWIN = pyproj-1.9.3.win32-py2.7.exe
 
 # TODO Wix: http://wix.codeplex.com/downloads/get/582218
 
@@ -23,7 +24,7 @@ windeps:
 	cd windeps; if ! [ -f $(WIN32) ]; then curl -L -o $(WIN32) "http://sourceforge.net/projects/pywin32/files/pywin32/Build%20218/$(WIN32)/download"; fi
 	cd windeps; if ! [ -f $(PY2EXE) ]; then curl -L -o $(PY2EXE) "http://sourceforge.net/projects/py2exe/files/py2exe/0.6.9/$(PY2EXE)/download"; fi
 	cd windeps; if ! [ -f $(PYGUI) ]; then curl -O "http://www.cosc.canterbury.ac.nz/greg.ewing/python_gui/$(PYGUI)"; fi
-
+	cd windeps; if ! [ -f $(PROJWIN) ]; then curl -O "http://pyproj.googlecode.com/files/$(PROJWIN)"; fi
 
 clean:
 	rm -rf dist

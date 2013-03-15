@@ -10,6 +10,7 @@ from collections import OrderedDict, namedtuple
 from itertools import groupby, islice, chain
 
 import numpy as np
+from pyproj import Proj
 
 from sacker import wrap, unwrap, BadDataError
 import segy
@@ -293,13 +294,6 @@ SONAR_CHANNEL_HEADER = """
 def packets_gen(data, chaninfos, packet_filter):
     i = 0
     while data:
-        sys.stdout.write('\rPacket: %d' % i)
-
-        # only the last message is shown without flush(), but flushing too
-        # often slows things down
-        if i % 42 == 0:
-            sys.stdout.flush()
-
         pheader_len, pheader = unwrap(data, PACKET_HEADER)
         type = header_type(pheader)
 
@@ -343,6 +337,13 @@ def packets_gen(data, chaninfos, packet_filter):
             #        pheader['num_bytes_this_record']
             else:
                 yield Packet(pheader, data[:pheader['num_bytes_this_record']])
+
+        sys.stdout.write('\rPacket: %d' % i)
+
+        # only the last message is shown without flush(), but flushing too
+        # often slows things down
+        if i % 42 == 0:
+            sys.stdout.flush()
 
         data = data[pheader['num_bytes_this_record']:]
         i += 1
@@ -394,7 +395,7 @@ def export_XTF(infile, outfile, channel_numbers):
 
     write_XTF(outfile, header, chaninfos, packets_gen())
 
-def export_SEGY(infile, outfile, (channel_number,)):
+def export_SEGY(infile, outfile, (channel_number,), to_utm=True):
     header, chaninfos, packets = read_XTF(infile, 'sonar')
     chaninfo = chaninfos[channel_number]
 
@@ -421,9 +422,31 @@ def export_SEGY(infile, outfile, (channel_number,)):
         ensemble_fold = 1, # that's what Chesapeake XTF-To-SEGY is doing
     )
 
+    if to_utm:
+        # peek first point coordinates
+        lon = p0.sheader['sensor_xcoordinate']
+        lat = p0.sheader['sensor_ycoordinate']
+
+        # autodetect UTM zone and hemisphere
+        zone = int((lon + 180.0) % 360.0 / 6) + 1
+        south = lat < 0.0
+        print 'UTM parameters: zone #%d, %s hemisphere' % \
+                                (zone, 'southern' if south else 'northern')
+
+        utm = Proj(proj = 'utm', zone = zone, ellps = 'WGS84', south = south)
+
     def d2s(deg, scale):
         """Convert degrees to (scaled) seconds of arc"""
-        return int(round(deg * 60 * 60 * scale))
+        return deg * 60 * 60 * scale
+
+    if to_utm:
+        units = 1 # length
+        scaler = 1
+        convertor = utm
+    else:
+        units = 2 # secs of arc
+        scaler = -100
+        convertor = lambda lon, lat: (d2s(lon, 100), d2s(lat, 100))
 
     def traces():
         for i, p in enumerate(packets):
@@ -431,6 +454,9 @@ def export_SEGY(infile, outfile, (channel_number,)):
             # make sure we don't have variable trace len or sample interval
             assert p.cheader['num_samples'] == p0.cheader['num_samples']
             assert p.cheader['time_duration'] == p0.cheader['time_duration']
+
+            x, y = convertor(p.sheader['sensor_xcoordinate'],
+                             p.sheader['sensor_ycoordinate'])
 
             trace_header = dict(
                 # ignoring p.sheader['ping_number'], it counts 1 3 5 7...
@@ -449,15 +475,14 @@ def export_SEGY(infile, outfile, (channel_number,)):
                 sample_interval = sample_interval,
                 elevations_scaler = 1,
 
-                coordinate_units = 2, # secs of arc
-                coordinates_scaler = -100,
-
-                reciever_coord_x = d2s(p.sheader['sensor_xcoordinate'], 100),
-                reciever_coord_y = d2s(p.sheader['sensor_ycoordinate'], 100),
+                coordinate_units = units,
+                coordinates_scaler = scaler,
+                reciever_coord_x = int(round(x)),
+                reciever_coord_y = int(round(y)),
 
                 # Chesapeake XTF-To-SEGY does this, but I think it's wrong
-                #source_coord_x = d2s(p.sheader['ship_xcoordinate'], 100),
-                #source_coord_y = d2s(p.sheader['ship_ycoordinate'], 100),
+                #source_coord_x = ... p.sheader['ship_xcoordinate'] ... ,
+                #source_coord_y = ... p.sheader['ship_ycoordinate'] ... ,
 
                 #ensemble_num = ... # For marks when importing to Geographix
             )
