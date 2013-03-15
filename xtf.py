@@ -397,7 +397,11 @@ def export_XTF(infile, outfile, channel_numbers):
 
 def export_SEGY(infile, outfile, (channel_number,), to_utm=True):
     header, chaninfos, packets = read_XTF(infile, 'sonar')
-    chaninfo = chaninfos[channel_number]
+    try:
+        chaninfo = chaninfos[channel_number]
+    except IndexError:
+        raise BadDataError('Channel %d not found in %r' %
+                                            (channel_number + 1, infile))
 
     packets = (p for p in packets if p.channel_number == channel_number)
 

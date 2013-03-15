@@ -20,7 +20,7 @@ from GUI.StdMenus import basic_menus, edit_cmds, pref_cmds, print_cmds
 from GUI.StdButtons import DefaultButton
 from GUI.Numerical import image_from_ndarray
 from GUI.BaseAlertFunctions import present_and_destroy
-from GUI.Alerts import confirm
+from GUI.Alerts import confirm, stop_alert
 
 import xtf
 
@@ -174,8 +174,15 @@ class ProjectWindow(Window):
                                      % (out_dir.path, ', '.join(existing)))):
                 for i, (s, d, df) in enumerate(zip(src, dst, dstf)):
                     log('[%d/%d] %s -> %s' % (i+1, len(dst), s, d))
-                    export_function(s, df, numbers)
-                log('Finished!')
+                    try:
+                        export_function(s, df, numbers)
+                    except xtf.BadDataError, e:
+                        msg = 'Aborted! %s.' % (e,)
+                        log(msg)
+                        stop_alert(msg)
+                        break
+                else:
+                    log('Finished!')
                 return True
 
     def project_changed(self, model, recent_filename = None):
