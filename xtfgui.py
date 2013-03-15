@@ -31,11 +31,13 @@ def app_menu(profiles = None):
             'open_cmd': 'Open Project...',
             'save_cmd': 'Save Project',
             'save_as_cmd': 'Save Project As...'})
-    menus.append(Menu('Traces', [('Export headers to CSV (Excel)...',
-                                  'export_csv_cmd')]))
     menus.append(Menu('Profile', [('Import XTF files...', 'import_cmd'),
                                   '-',
                                   (profiles or [], 'profiles_cmd')]))
+    menus.append(Menu('Tools', [('Export trace headers to CSV (Excel)...',
+                                  'export_csv_cmd'),
+                                #('Preferences...', 'preferences_cmd')
+                               ]))
     return menus
 
 class XTFApp(Application):
