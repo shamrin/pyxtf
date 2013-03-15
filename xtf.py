@@ -338,7 +338,7 @@ def packets_gen(data, chaninfos, packet_filter):
             else:
                 yield Packet(pheader, data[:pheader['num_bytes_this_record']])
 
-        sys.stdout.write('\rPacket: %d' % i)
+        sys.stdout.write('Packet: %d\r' % i)
 
         # only the last message is shown without flush(), but flushing too
         # often slows things down
@@ -430,8 +430,8 @@ def export_SEGY(infile, outfile, (channel_number,), to_utm=True):
         # autodetect UTM zone and hemisphere
         zone = int((lon + 180.0) % 360.0 / 6) + 1
         south = lat < 0.0
-        print 'UTM parameters: zone #%d, %s hemisphere' % \
-                                (zone, 'southern' if south else 'northern')
+        sys.stdout.write('UTM parameters: zone #%d, %s hemisphere\n' %
+                                (zone, 'southern' if south else 'northern'))
 
         utm = Proj(proj = 'utm', zone = zone, ellps = 'WGS84', south = south)
 

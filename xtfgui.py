@@ -4,6 +4,7 @@ import os
 import csv
 import webbrowser
 import re
+import sys
 
 import numpy
 from GUI import Application, ScrollableView, Document, Window, Globals, rgb
@@ -22,6 +23,9 @@ from GUI.BaseAlertFunctions import present_and_destroy
 from GUI.Alerts import confirm
 
 import xtf
+
+def log(*args):
+    sys.stdout.write(' '.join(args) + '\n')
 
 def app_menu(profiles = None):
     menus = basic_menus(
@@ -167,9 +171,9 @@ class ProjectWindow(Window):
             if (not existing or confirm('%s already has files: %s. Overwrite?'
                                      % (out_dir.path, ', '.join(existing)))):
                 for i, (s, d, df) in enumerate(zip(src, dst, dstf)):
-                    print '[%d/%d]' % (i+1, len(dst)), s, '->', d
+                    log('[%d/%d] %s -> %s' % (i+1, len(dst), s, d))
                     export_function(s, df, numbers)
-                print 'Finished!'
+                log('Finished!')
                 return True
 
     def project_changed(self, model, recent_filename = None):
@@ -317,9 +321,9 @@ class XTFFile(object):
         self.filename = filename
 
         header, nchannels, arrays = xtf.read_XTF_as_grayscale_arrays(filename)
-        print 'File %r, header:' % (filename,)
-        print '  ' + '\n  '.join('%s: %r' % (k.replace('_', ' '), v)
-                                 for k, v in header.items())
+        log('File %r, header:' % (filename,))
+        log('  ' + '\n  '.join('%s: %r' % (k.replace('_', ' '), v)
+                               for k, v in header.items()))
 
         self.headers = []
         self.channels = []
