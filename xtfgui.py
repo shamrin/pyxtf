@@ -144,14 +144,16 @@ class ProjectWindow(Window):
             xtf.export_SEGY(self.xtf_file.filename, filename, numbers)
 
     def xtf_all_cmd(self):
+        default_dir = self.document.file.dir if self.document.file else None
         ref = request_old_directory('Save XTF files to folder',
-                                    self.xtf_dir or self.document.file.dir)
+                                    self.xtf_dir or default_dir)
         if self.batch_export(ref, xtf.export_XTF, '.xtf'):
             self.xtf_dir = ref # remember selected dir for next time
 
     def segy_all_cmd(self):
+        default_dir = self.document.file.dir if self.document.file else None
         ref = request_old_directory('Save SEG-Y files to folder',
-                                    self.segy_dir or self.document.file.dir)
+                                    self.segy_dir or default_dir)
         if self.batch_export(ref, xtf.export_SEGY, '.seg'):
             self.segy_dir = ref # remember selected dir for next time
 
