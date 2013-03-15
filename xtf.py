@@ -370,7 +370,7 @@ def grayscale_arrays_gen(packets, chaninfos):
         r = np.vstack(traces).transpose()
         yield num, type, headers, r
 
-def copy_XTF(infile, outfile, channel_numbers):
+def export_XTF(infile, outfile, channel_numbers):
     header, chaninfos, packets = read_XTF(infile, '*')
 
     channel_numbers = sorted(set(channel_numbers))
@@ -535,7 +535,7 @@ def main(infile):
     P.show()
 
 def test_copy(infile):
-    copy_XTF(infile, infile+'_test_ch1.xtf', [1])
+    export_XTF(infile, infile+'_test_ch1.xtf', [1])
     export_SEGY(infile, infile+'_test_ch0.segy', [0])
 
 if __name__ == '__main__':

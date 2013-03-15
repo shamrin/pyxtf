@@ -3,12 +3,13 @@
 import os
 import csv
 import webbrowser
+import re
 
 import numpy
 from GUI import Application, ScrollableView, Document, Window, Globals, rgb
 from GUI import Image, Frame, Font, Model, Label, Menu, Grid, CheckBox, Button
 from GUI import BaseAlert
-from GUI.Files import FileType
+from GUI.Files import FileType, DirRef
 from GUI.FileDialogs import request_old_files, request_new_file
 from GUI.Geometry import (pt_in_rect, offset_rect, rects_intersect,
                           rect_sized, rect_height, rect_size)
@@ -18,6 +19,7 @@ from GUI.StdMenus import basic_menus, edit_cmds, pref_cmds, print_cmds
 from GUI.StdButtons import DefaultButton
 from GUI.Numerical import image_from_ndarray
 from GUI.BaseAlertFunctions import present_and_destroy
+from GUI.Alerts import confirm
 
 import xtf
 
@@ -56,10 +58,37 @@ class XTFApp(Application):
     def about_cmd(self):
         present_and_destroy(AboutBox())
 
+def request_old_directory(prompt, default_dir = None):
+    # GUI.Win32.BaseFileDialogs._request_old_dir, but with BIF_NEWDIALOGSTYLE
+
+    from win32com.shell import shell as sh
+    import win32com.shell.shellcon as sc
+    import win32api as api
+    import win32gui as gui
+    from GUI.BaseFileDialogs import win_fix_prompt
+
+    BIF_NEWDIALOGSTYLE = 0x0040
+    win_bif_flags = sc.BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE
+    if default_dir:
+        def callback(hwnd, msg, lp, data):
+            if msg == sc.BFFM_INITIALIZED:
+                api.SendMessage(hwnd, sc.BFFM_SETSELECTION, True, default_dir.path)
+    else:
+        callback = None
+    (idl, name, images) = sh.SHBrowseForFolder(None, None,
+        win_fix_prompt(prompt), win_bif_flags, callback)
+    if idl:
+        return DirRef(sh.SHGetPathFromIDList(idl))
+
+
+XTF_TYPE = FileType(name = 'XTF file', suffix = 'xtf')
+SEGY_TYPE = FileType(name = 'SEG-Y file', suffix = 'seg')
 
 class ProjectWindow(Window):
     def __init__(self, document):
         self.current_file = None
+        self.xtf_dir = None
+        self.segy_dir = None
         Window.__init__(self, size = (500, 400), document = document)
         self.project_changed(document)
 
@@ -82,8 +111,7 @@ class ProjectWindow(Window):
             m.profiles_cmd[self.current_file].checked = True
 
     def import_cmd(self):
-        refs = request_old_files('Import XTF files',
-                                 file_types = [XTFFile.xtf_type])
+        refs = request_old_files('Import XTF files', file_types = [XTF_TYPE])
         if refs is not None:
             self.document.add_files([os.path.join(r.dir.path, r.name)
                                      for r in refs])
@@ -96,12 +124,51 @@ class ProjectWindow(Window):
         self.xtf_file.export_csv()
 
     def xtf_cmd(self):
-        numbers = [i for i, cb in enumerate(self.checkboxes) if cb.value]
-        self.xtf_file.save_xtf(numbers)
+        ref = request_new_file('Save XTF file', file_type = XTF_TYPE)
+        if ref is not None:
+            numbers = [i for i, cb in enumerate(self.checkboxes) if cb.value]
+            filename = os.path.join(ref.dir.path, ref.name)
+            xtf.export_XTF(self.xtf_file.filename, filename, numbers)
 
     def segy_cmd(self):
-        numbers = [i for i, cb in enumerate(self.checkboxes) if cb.value]
-        self.xtf_file.save_segy(numbers)
+        ref = request_new_file('Save SEG-Y file', file_type = SEGY_TYPE)
+        if ref is not None:
+            numbers = [i for i, cb in enumerate(self.checkboxes) if cb.value]
+            filename = os.path.join(ref.dir.path, ref.name)
+            xtf.export_SEGY(self.xtf_file.filename, filename, numbers)
+
+    def xtf_all_cmd(self):
+        ref = request_old_directory('Save XTF files to folder',
+                                    self.xtf_dir or self.document.file.dir)
+        if self.batch_export(ref, xtf.export_XTF, '.xtf'):
+            self.xtf_dir = ref # remember selected dir for next time
+
+    def segy_all_cmd(self):
+        ref = request_old_directory('Save SEG-Y files to folder',
+                                    self.segy_dir or self.document.file.dir)
+        if self.batch_export(ref, xtf.export_SEGY, '.seg'):
+            self.segy_dir = ref # remember selected dir for next time
+
+    def batch_export(self, out_dir, export_function, ext):
+        """Run export_function on all project files. Return True on success"""
+
+        ext_re = re.compile(r'\.xtf$', re.I)
+
+        if out_dir is not None:
+            numbers = [i for i, cb in enumerate(self.checkboxes) if cb.value]
+
+            src = self.document.abspaths()
+            dst = [ext_re.sub('', os.path.split(p)[1]) + ext for p in src]
+            dstf = [os.path.join(out_dir.path, d) for d in dst]
+
+            existing = [d for d, df in zip(dst, dstf) if os.path.exists(df)]
+            if (not existing or confirm('%s already has files: %s. Overwrite?'
+                                     % (out_dir.path, ', '.join(existing)))):
+                for i, (s, d, df) in enumerate(zip(src, dst, dstf)):
+                    print '[%d/%d]' % (i+1, len(dst)), s, '->', d
+                    export_function(s, df, numbers)
+                print 'Finished!'
+                return True
 
     def project_changed(self, model, recent_filename = None):
         doc = self.document
@@ -266,8 +333,6 @@ class XTFFile(object):
             self.channels.append(Channel(image, num))
 
     csv_type = FileType(name = 'CSV file', suffix = 'csv')
-    xtf_type = FileType(name = 'XTF file', suffix = 'xtf')
-    segy_type = FileType(name = 'SEG-Y file', suffix = 'seg')
 
     def export_csv(self):
         ref = request_new_file('Export CSV file', file_type = self.csv_type)
@@ -277,18 +342,6 @@ class XTFFile(object):
                               for n in xtf.TraceHeader._fields])
             for header in self.headers:
                 outfile.writerow(header)
-
-    def save_xtf(self, channel_numbers):
-        ref = request_new_file('Save XTF file', file_type = self.xtf_type)
-        if ref is not None:
-            xtf.copy_XTF(self.filename, os.path.join(ref.dir.path, ref.name),
-                         channel_numbers)
-
-    def save_segy(self, channel_numbers):
-        ref = request_new_file('Save SEG-Y file', file_type = self.segy_type)
-        if ref is not None:
-            xtf.export_SEGY(self.filename, os.path.join(ref.dir.path, ref.name),
-                            channel_numbers)
 
 
 class FileView(Frame):
