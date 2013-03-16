@@ -13,4 +13,6 @@ call(["c:/Python27/python" , "doc/build_docs", "doc/README_ru.markdown",
 setup(console = ['xtfgui.py'],
       #windows = [ {'script': 'xtfgui.py', 'version': __version__ }],
       options = { 'py2exe': { 'excludes': ['Tkinter', '_ssl'] }},
-      data_files = [('.', ['doc/README_ru.html', 'doc/screenshot.png'])])
+      data_files = [('.', ['doc/README_ru.html',
+                           'doc/screenshot.png',
+                           'doc/prefs_screenshot.png'])])
