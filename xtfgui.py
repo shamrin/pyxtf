@@ -31,7 +31,7 @@ def log(*args):
 
 def app_menu(profiles = None):
     menus = basic_menus(
-        exclude = edit_cmds + pref_cmds + print_cmds + 'revert_cmd',
+        exclude = edit_cmds + pref_cmds + print_cmds + 'revert_cmd' + 'about_cmd',
         substitutions = {
             'new_cmd': 'New Project',
             'open_cmd': 'Open Project...',
@@ -44,6 +44,8 @@ def app_menu(profiles = None):
                                   'export_csv_cmd'),
                                 ('Preferences...', 'preferences_cmd')
                                ]))
+    menus.append(Menu('Help', [('Help...', 'help_cmd'),
+                               ('About XTF Surveyor...', 'about_cmd')]))
     return menus
 
 class XTFApp(Application):
@@ -63,6 +65,10 @@ class XTFApp(Application):
 
     def make_window(self, document):
         ProjectWindow(document).show()
+
+    def help_cmd(self):
+        path = os.path.join(os.path.dirname(sys.argv[0]), 'README_ru.html')
+        webbrowser.open('file:///' + path)
 
     def about_cmd(self):
         present_and_destroy(AboutBox())
@@ -159,6 +165,7 @@ class ProjectWindow(Window):
     def setup_menus(self, m):
         Window.setup_menus(self, m)
         m.about_cmd.enabled = True
+        m.help_cmd.enabled = True
         m.import_cmd.enabled = True
         m.preferences_cmd.enabled = True
         if self.current_file is not None:
