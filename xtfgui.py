@@ -5,11 +5,12 @@ import csv
 import webbrowser
 import re
 import sys
+from functools import partial
 
 import numpy
 from GUI import Application, ScrollableView, Document, Window, Globals, rgb
 from GUI import Image, Frame, Font, Model, Label, Menu, Grid, CheckBox, Button
-from GUI import BaseAlert
+from GUI import BaseAlert, ModalDialog, TextField, application
 from GUI.Files import FileType, DirRef
 from GUI.FileDialogs import request_old_files, request_new_file
 from GUI.Geometry import (pt_in_rect, offset_rect, rects_intersect,
@@ -17,12 +18,13 @@ from GUI.Geometry import (pt_in_rect, offset_rect, rects_intersect,
 from GUI.StdColors import black, red, light_grey, white
 from GUI.StdFonts import system_font
 from GUI.StdMenus import basic_menus, edit_cmds, pref_cmds, print_cmds
-from GUI.StdButtons import DefaultButton
+from GUI.StdButtons import CancelButton, DefaultButton
 from GUI.Numerical import image_from_ndarray
 from GUI.BaseAlertFunctions import present_and_destroy
 from GUI.Alerts import confirm, stop_alert
 
 import xtf
+from xtf import UTMParams
 
 def log(*args):
     sys.stdout.write(' '.join(args) + '\n')
@@ -40,7 +42,7 @@ def app_menu(profiles = None):
                                   (profiles or [], 'profiles_cmd')]))
     menus.append(Menu('Tools', [('Export trace headers to CSV (Excel)...',
                                   'export_csv_cmd'),
-                                #('Preferences...', 'preferences_cmd')
+                                ('Preferences...', 'preferences_cmd')
                                ]))
     return menus
 
@@ -51,6 +53,7 @@ class XTFApp(Application):
         self.proj_type = FileType(name = "XTF Project", suffix = "project")
         self.file_type = self.proj_type
         self.menus = []
+        self.utm_params = UTMParams(auto = True)
 
     def open_app(self):
         self.new_cmd()
@@ -63,6 +66,55 @@ class XTFApp(Application):
 
     def about_cmd(self):
         present_and_destroy(AboutBox())
+
+    def preferences_cmd(self):
+        pw = PreferencesWindow(self.utm_params)
+        self.utm_params = pw.present()
+        pw.destroy()
+
+
+class PreferencesWindow(ModalDialog):
+    def __init__(self, utm_params):
+        self.old_utm_params = utm_params
+        if utm_params.auto:
+            utm = ''
+        else:
+            utm = '%d%s' % (utm_params.zone, 'S' if utm_params.south else 'N')
+
+        ModalDialog.__init__(self, title = 'Preferences')
+        label = Label(text = 'UTM zone and hemisphere for SEG-Y export\n'
+                             '(1 <= zone <= 60, hemisphere: S or N):\n')
+        self.place(label, left = 20, top = 20)
+        self.utm_field = TextField(text = utm)
+        self.place(self.utm_field, left = 20, top = label, right = -20)
+        self.utm_field.select_all()
+        label2 = Label(text = 'e.g. 17S, 43N\n')
+        self.place(label2, left = 20, top = self.utm_field)
+        default_button = DefaultButton()
+        cancel_button = CancelButton()
+        self.place(default_button, right = -20, top  = label2)
+        self.place(cancel_button, left = 20, top = label2)
+        self.shrink_wrap()
+        self.center()
+
+    def ok(self):
+        text = self.utm_field.text
+
+        if not text or text.isspace():
+            self.dismiss(UTMParams(auto = True))
+            return
+
+        m = re.match('^\s*(\d+)\s*([SN])\s*$', text, re.I)
+        if m and 1 <= int(m.group(1)) <= 60:
+            self.dismiss(UTMParams(zone = int(m.group(1)),
+                             south = m.group(2).upper() == 'S'))
+        else:
+            stop_alert('Incorrect UTM zone. Allowed values:\n1N - 60N or 1S - 60S.')
+            self.utm_field.select_all()
+
+    def cancel(self):
+        self.dismiss(self.old_utm_params)
+
 
 def request_old_directory(prompt, default_dir = None):
     # GUI.Win32.BaseFileDialogs._request_old_dir, but with BIF_NEWDIALOGSTYLE
@@ -100,15 +152,15 @@ class ProjectWindow(Window):
 
     def close_cmd(self):
         Window.close_cmd(self)
-        app = Globals._application
-        if not app.windows:
+        if not application().windows:
             # force close: the remaining console window stops app from quiting
-            app._quit()
+            application()._quit()
 
     def setup_menus(self, m):
         Window.setup_menus(self, m)
         m.about_cmd.enabled = True
         m.import_cmd.enabled = True
+        m.preferences_cmd.enabled = True
         if self.current_file is not None:
             m.export_csv_cmd.enabled = True
         m.profiles_cmd.enabled = True
@@ -141,7 +193,8 @@ class ProjectWindow(Window):
         if ref is not None:
             numbers = [i for i, cb in enumerate(self.checkboxes) if cb.value]
             filename = os.path.join(ref.dir.path, ref.name)
-            xtf.export_SEGY(self.xtf_file.filename, filename, numbers)
+            xtf.export_SEGY(self.xtf_file.filename, filename, numbers,
+                            utm_params = application().utm_params)
 
     def xtf_all_cmd(self):
         default_dir = self.document.file.dir if self.document.file else None
@@ -154,7 +207,8 @@ class ProjectWindow(Window):
         default_dir = self.document.file.dir if self.document.file else None
         ref = request_old_directory('Save SEG-Y files to folder',
                                     self.segy_dir or default_dir)
-        if self.batch_export(ref, xtf.export_SEGY, '.seg'):
+        export = partial(xtf.export_SEGY, utm_params = application().utm_params)
+        if self.batch_export(ref, export, '.seg'):
             self.segy_dir = ref # remember selected dir for next time
 
     def batch_export(self, out_dir, export_function, ext):

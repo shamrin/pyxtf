@@ -15,6 +15,13 @@ from pyproj import Proj
 from sacker import wrap, unwrap, BadDataError
 import segy
 
+def UTMParams(auto = False, zone = None, south = None):
+    if auto:
+        assert not zone and south is None
+    else:
+        assert zone and south is not None
+    return namedtuple('UTM', 'auto zone south')(auto, zone, south)
+
 # XTF spec: http://www.tritonimaginginc.com/site/content/public/downloads/FileFormatInfo/Xtf%20File%20Format_X35.pdf
 
 CHAN_TYPES = {
@@ -395,7 +402,8 @@ def export_XTF(infile, outfile, channel_numbers):
 
     write_XTF(outfile, header, chaninfos, packets_gen())
 
-def export_SEGY(infile, outfile, (channel_number,), to_utm=True):
+def export_SEGY(infile, outfile, (channel_number,),
+                to_utm = True, utm_params = UTMParams(auto = True)):
     header, chaninfos, packets = read_XTF(infile, 'sonar')
     try:
         chaninfo = chaninfos[channel_number]
@@ -431,11 +439,15 @@ def export_SEGY(infile, outfile, (channel_number,), to_utm=True):
         lon = p0.sheader['sensor_xcoordinate']
         lat = p0.sheader['sensor_ycoordinate']
 
-        # autodetect UTM zone and hemisphere
-        zone = int((lon + 180.0) % 360.0 / 6) + 1
-        south = lat < 0.0
-        sys.stdout.write('UTM parameters: zone #%d, %s hemisphere\n' %
+        if utm_params.auto:
+            # autodetect UTM zone and hemisphere
+            zone = int((lon + 180.0) % 360.0 / 6) + 1
+            south = lat < 0.0
+            sys.stdout.write('UTM parameters: zone #%d, %s hemisphere\n' %
                                 (zone, 'southern' if south else 'northern'))
+        else:
+            zone = utm_params.zone
+            south = utm_params.south
 
         utm = Proj(proj = 'utm', zone = zone, ellps = 'WGS84', south = south)
 
