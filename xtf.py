@@ -443,8 +443,8 @@ def export_SEGY(infile, outfile, (channel_number,),
             # autodetect UTM zone and hemisphere
             zone = int((lon + 180.0) % 360.0 / 6) + 1
             south = lat < 0.0
-            sys.stdout.write('UTM parameters: zone #%d, %s hemisphere\n' %
-                                (zone, 'southern' if south else 'northern'))
+            sys.stdout.write('UTM parameters: %d%s\n' %
+                                (zone, 'S' if south else 'N'))
         else:
             zone = utm_params.zone
             south = utm_params.south
