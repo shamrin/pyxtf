@@ -2,6 +2,10 @@
 
 ![XTF Surveyor screenshot](doc/screenshot.png)
 
+**[Download XTF Surveyor for Windows][download]**
+
+[download]: http://sourceforge.net/projects/pyxtf/files/XTF_Surveyor_v0.5.msi/download
+
 **Features:**
 
 * view [XTF (eXtended Triton Format)][XTF] files with subbottom seismic data
