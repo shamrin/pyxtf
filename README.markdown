@@ -4,10 +4,13 @@
 
 **Features:**
 
-* view XTF files (subbottom seismic channels)
-* convert selected channels to SEG-Y or (another) XTF file
+* view [XTF (eXtended Triton Format)][XTF] files with subbottom seismic data
+* convert selected channels to [SEG-Y][] or (another) XTF file
 
 *Limitation:* side-scan data wasn't tested. It could work, though converting side-scan to SEG-Y doesn't make sense, obviously.
+
+[XTF]: http://en.wikipedia.org/wiki/EXtended_Triton_Format
+[SEG-Y]: http://en.wikipedia.org/wiki/SEG_Y
 
 ### Python modules for XTF and SEG-Y
 
