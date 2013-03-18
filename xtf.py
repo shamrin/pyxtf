@@ -8,9 +8,14 @@ import sys
 from pprint import pprint, pformat
 from collections import OrderedDict, namedtuple
 from itertools import groupby, islice, chain
+from getpass import getuser
+from datetime import datetime
+from string import Template
+import re
 
 import numpy as np
 
+import version
 from sacker import wrap, unwrap, BadDataError
 import segy
 
@@ -507,7 +512,24 @@ def export_SEGY(infile, outfile, (channel_number,),
             )
             yield trace_header, p.trace
 
-    segy.write_SEGY(outfile, segy_header, 'Test header', traces())
+    text_header = Template("""Converted $filename to SEG-Y
+XTF Surveyor v$version, $url
+Converted by: $user
+Converted at: $datetime
+XTF recording program: $program
+XTF this file name: $this_filename
+XTF note string: $note""").substitute(
+    filename = infile,
+    version =  version.__version__,
+    url = version.url,
+    user = getuser(),
+    datetime = datetime.now(),
+    note = '\n' + re.sub(r'\r+', '\n', header['note_string']),
+    this_filename = header['this_file_name'],
+    program = '%s v%s' % (header['recording_program_name'],
+                          header['recording_program_version']))
+
+    segy.write_SEGY(outfile, segy_header, text_header, traces())
 
 PLOT_NTRACES = 3000
 

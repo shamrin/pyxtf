@@ -509,10 +509,9 @@ class Project(Document):
 
 
 class AboutBox(BaseAlert):
-    url = 'https://github.com/shamrin/pyxtf'
-
     def __init__(self):
-        from version import __version__ as ver
+        from version import url, __version__ as ver
+        self.url = url
         BaseAlert.__init__(self, 'note', '%s, version %s\n\n%s' %
                                     (Globals.application_name, ver, self.url),
                                  button_labels = ['OK', 'Visit home page'])
