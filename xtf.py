@@ -19,13 +19,6 @@ import version
 from sacker import wrap, unwrap, BadDataError
 import segy
 
-def UTMParams(auto = False, zone = None, south = None):
-    if auto:
-        assert not zone and south is None
-    else:
-        assert zone and south is not None
-    return namedtuple('UTM', 'auto zone south')(auto, zone, south)
-
 # XTF spec: http://www.tritonimaginginc.com/site/content/public/downloads/FileFormatInfo/Xtf%20File%20Format_X35.pdf
 
 CHAN_TYPES = {
@@ -406,8 +399,8 @@ def export_XTF(infile, outfile, channel_numbers):
 
     write_XTF(outfile, header, chaninfos, packets_gen())
 
-def export_SEGY(infile, outfile, (channel_number,),
-                to_utm = True, utm_params = UTMParams(auto = True)):
+def export_SEGY(infile, outfile, (channel_number,), to_utm = True,
+                                                    utm_params = None):
     header, chaninfos, packets = read_XTF(infile, 'sonar')
     try:
         chaninfo = chaninfos[channel_number]
@@ -439,37 +432,31 @@ def export_SEGY(infile, outfile, (channel_number,),
     )
 
     if to_utm:
-        # peek first point coordinates
-        lon = p0.sheader['sensor_xcoordinate']
-        lat = p0.sheader['sensor_ycoordinate']
-
-        if utm_params.auto:
-            # autodetect UTM zone and hemisphere
+        def detect():
+            """Detect UTM parameters from first point coordinates"""
+            lon = p0.sheader['sensor_xcoordinate']
+            lat = p0.sheader['sensor_ycoordinate']
             zone = int((lon + 180.0) % 360.0 / 6) + 1
-            south = lat < 0.0
-        else:
-            zone = utm_params.zone
-            south = utm_params.south
+            hemisphere = 'S' if lat < 0.0 else 'N'
+            sys.stdout.write('Detected UTM zone: %d%s\n' % (zone, hemisphere))
+            return zone, hemisphere
 
-        utm_name = '%d%s' % (zone, 'S' if south else 'N')
-        if utm_params.auto:
-            sys.stdout.write('Detected UTM zone: %s\n' % utm_name)
+        zone, hemisphere = utm_params or detect()
+        print 'zone=%r, hemi=%r' % (zone, hemisphere)
 
         from pyproj import Proj
-        utm = Proj(proj = 'utm', zone = zone, ellps = 'WGS84', south = south)
-
-    def d2s(deg, scale):
-        """Convert degrees to (scaled) seconds of arc"""
-        return deg * 60 * 60 * scale
-
-    if to_utm:
         units = 1 # length
         scaler = 1
-        convertor = utm
+        converter = Proj(proj = 'utm', zone = zone, south = hemisphere == 'S',
+                                                    ellps = 'WGS84')
     else:
+        def d2s(deg, scale):
+            """Convert degrees to (scaled) seconds of arc"""
+            return deg * 60 * 60 * scale
+
         units = 2 # secs of arc
         scaler = -100
-        convertor = lambda lon, lat: (d2s(lon, 100), d2s(lat, 100))
+        converter = lambda lon, lat: (d2s(lon, 100), d2s(lat, 100))
 
     def traces():
         for i, p in enumerate(packets):
@@ -478,7 +465,7 @@ def export_SEGY(infile, outfile, (channel_number,),
             assert p.cheader['num_samples'] == p0.cheader['num_samples']
             assert p.cheader['time_duration'] == p0.cheader['time_duration']
 
-            x, y = convertor(p.sheader['sensor_xcoordinate'],
+            x, y = converter(p.sheader['sensor_xcoordinate'],
                              p.sheader['sensor_ycoordinate'])
 
             trace_header = dict(
@@ -531,7 +518,7 @@ XTF note string: $note""").substitute(
     this_filename = header['this_file_name'],
     program = '%s v%s' % (header['recording_program_name'],
                           header['recording_program_version']),
-    coord = 'UTM %s, m' % utm_name if to_utm else 'geographic')
+    coord = 'UTM %d%s, m' % (zone, hemisphere) if to_utm else 'geographic')
 
     segy.write_SEGY(outfile, segy_header, text_header, traces())
 

@@ -24,7 +24,6 @@ from GUI.BaseAlertFunctions import present_and_destroy
 from GUI.Alerts import confirm, stop_alert
 
 import xtf
-from xtf import UTMParams
 
 def log(*args):
     sys.stdout.write(' '.join(args) + '\n')
@@ -55,7 +54,7 @@ class XTFApp(Application):
         self.proj_type = FileType(name = "XTF Project", suffix = "project")
         self.file_type = self.proj_type
         self.menus = []
-        self.utm_params = UTMParams(auto = True)
+        self.utm_params = None
 
     def open_app(self):
         self.new_cmd()
@@ -82,10 +81,7 @@ class XTFApp(Application):
 class PreferencesWindow(ModalDialog):
     def __init__(self, utm_params):
         self.old_utm_params = utm_params
-        if utm_params.auto:
-            utm = ''
-        else:
-            utm = '%d%s' % (utm_params.zone, 'S' if utm_params.south else 'N')
+        utm = '%d%s' % utm_params if utm_params else ''
 
         ModalDialog.__init__(self, title = 'Preferences')
         label = Label(text = 'UTM zone and hemisphere for SEG-Y export\n'
@@ -107,13 +103,13 @@ class PreferencesWindow(ModalDialog):
         text = self.utm_field.text
 
         if not text or text.isspace():
-            self.dismiss(UTMParams(auto = True))
+            self.dismiss(None)
             return
 
         m = re.match('^\s*(\d+)\s*([SN])\s*$', text, re.I)
         if m and 1 <= int(m.group(1)) <= 60:
-            self.dismiss(UTMParams(zone = int(m.group(1)),
-                             south = m.group(2).upper() == 'S'))
+            utm_params = int(m.group(1)), m.group(2).upper()
+            self.dismiss(utm_params)
         else:
             stop_alert('Incorrect UTM zone. Allowed values:\n1N - 60N or 1S - 60S.')
             self.utm_field.select_all()
