@@ -160,7 +160,7 @@ def write_SEGY(outfile, file_header, text, traces):
 
 def read_SEGY(infile):
     file_data = memoryview(open(infile, 'rb').read())
-    #print decode_text(file_data[:TEXT_LEN])
+    print decode_text(file_data[:TEXT_LEN].tobytes())
     data = file_data[TEXT_LEN:]
     header_len, header = SEGY_HEADER.unwrap(data, data_factory = OrderedDict)
     pprint([(k, v) for k, v in header.items() if v != 0])

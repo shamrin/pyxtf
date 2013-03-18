@@ -1,6 +1,6 @@
 """xtf.py - read and show eXtended Triton Format (XTF) files
 
-From command line (requires Matplotlib):
+From command line:
     python xtf.py <path-to-xtf-file>
 """
 
@@ -511,7 +511,7 @@ def export_SEGY(infile, outfile, (channel_number,),
 
 PLOT_NTRACES = 3000
 
-def main(infile):
+def plot(infile):
     header, chaninfos, packets = read_XTF(infile, 'sonar')
     packets = sorted(packets, key=lambda p: p.channel_number)
 
@@ -582,8 +582,19 @@ def test_copy(infile):
     export_XTF(infile, infile+'_test_ch1.xtf', [1])
     export_SEGY(infile, infile+'_test_ch0.segy', [0])
 
+def main(infile):
+    header, chaninfos, packets = read_XTF(infile, 'sonar')
+    pprint(header.items())
+    for packet in packets:
+        pprint(packet.pheader)
+        pprint(packet.sheader)
+        pprint(packet.cheader)
+        break
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         sys.exit('Error: wrong arguments\n' + __doc__.rstrip())
+
     main(*sys.argv[1:])
+    #plot(*sys.argv[1:])
     #test_copy(*sys.argv[1:])
