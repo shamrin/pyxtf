@@ -5,7 +5,6 @@ TODO
 * separate modules for xtf.py and segy.py (or one module), upload to PyPI
 * allow upgrade installation
 * download dependencies with Python script, or bitsadmin-using batch file
-* don't import pyproj when to_utm == False
 * correct order of packets when writing CSV
 * don't overwrite CSV, XTF, SEG-Y on internal errors (use PyGUI machinery?)
 * use picket markers ('notes' packets pairs OR sheader.event_number)

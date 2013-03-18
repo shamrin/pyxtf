@@ -10,7 +10,6 @@ from collections import OrderedDict, namedtuple
 from itertools import groupby, islice, chain
 
 import numpy as np
-from pyproj import Proj
 
 from sacker import wrap, unwrap, BadDataError
 import segy
@@ -449,6 +448,7 @@ def export_SEGY(infile, outfile, (channel_number,),
             zone = utm_params.zone
             south = utm_params.south
 
+        from pyproj import Proj
         utm = Proj(proj = 'utm', zone = zone, ellps = 'WGS84', south = south)
 
     def d2s(deg, scale):
