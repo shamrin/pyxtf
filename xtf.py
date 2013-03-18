@@ -475,9 +475,12 @@ def export_SEGY(infile, outfile, (channel_number,),
                              p.sheader['sensor_ycoordinate'])
 
             trace_header = dict(
-                # ignoring p.sheader['ping_number'], it counts 1 3 5 7...
                 trace_seq_in_line = i + 1,
                 trace_seq_in_file = i + 1,
+
+                # not suitable for trace_seq_in_*, counts 1 3 5 7...
+                trace_num_in_orig_record = p.sheader['ping_number'],
+
                 trace_id_code = 1, # seismic
 
                 year = p.sheader['year'],
