@@ -447,11 +447,13 @@ def export_SEGY(infile, outfile, (channel_number,),
             # autodetect UTM zone and hemisphere
             zone = int((lon + 180.0) % 360.0 / 6) + 1
             south = lat < 0.0
-            sys.stdout.write('UTM parameters: %d%s\n' %
-                                (zone, 'S' if south else 'N'))
         else:
             zone = utm_params.zone
             south = utm_params.south
+
+        utm_name = '%d%s' % (zone, 'S' if south else 'N')
+        if utm_params.auto:
+            sys.stdout.write('Detected UTM zone: %s\n' % utm_name)
 
         from pyproj import Proj
         utm = Proj(proj = 'utm', zone = zone, ellps = 'WGS84', south = south)
@@ -516,6 +518,7 @@ def export_SEGY(infile, outfile, (channel_number,),
 XTF Surveyor v$version, $url
 Converted by: $user
 Converted at: $datetime
+Coordinates: $coord
 XTF recording program: $program
 XTF this file name: $this_filename
 XTF note string: $note""").substitute(
@@ -527,7 +530,8 @@ XTF note string: $note""").substitute(
     note = '\n' + re.sub(r'\r+', '\n', header['note_string']),
     this_filename = header['this_file_name'],
     program = '%s v%s' % (header['recording_program_name'],
-                          header['recording_program_version']))
+                          header['recording_program_version']),
+    coord = 'UTM %s, m' % utm_name if to_utm else 'geographic')
 
     segy.write_SEGY(outfile, segy_header, text_header, traces())
 

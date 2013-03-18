@@ -1,5 +1,4 @@
 TODO
-* write something to SEG-Y textual header
 * put license into installer
 * mention 'open source' in homepage
 * separate modules for xtf.py and segy.py (or one module), upload to PyPI
