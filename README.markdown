@@ -4,7 +4,7 @@
 
 **[Download XTF Surveyor for Windows][download]**
 
-[download]: http://sourceforge.net/projects/pyxtf/files/XTF_Surveyor_v0.6.msi/download
+[download]: http://sourceforge.net/projects/pyxtf/files/XTF_Surveyor_v0.6.1.msi/download
 
 **Features:**
 
