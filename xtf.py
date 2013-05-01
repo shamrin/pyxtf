@@ -405,13 +405,18 @@ def export_SEGY(infile, outfile, (channel_number,), to_utm = True,
     try:
         chaninfo = chaninfos[channel_number]
     except IndexError:
-        raise BadDataError('Channel %d not found in %r' %
+        raise BadDataError('Channel %d not found in "%s"' %
                                             (channel_number + 1, infile))
 
     packets = (p for p in packets if p.channel_number == channel_number)
 
     # peek first packet, and keep generator intact
-    p0 = packets.next()
+    try:
+        p0 = packets.next()
+    except StopIteration:
+        raise BadDataError('Channel %d not found inside "%s"' %
+                                            (channel_number + 1, infile))
+
     packets = chain([p0], packets)
 
     sample_interval = int(round(p0.cheader['time_duration'] /
