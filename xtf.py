@@ -439,8 +439,8 @@ def export_SEGY(infile, outfile, (channel_number,), to_utm = True,
     if to_utm:
         def detect():
             """Detect UTM parameters from first point coordinates"""
-            lon = p0.sheader['sensor_xcoordinate']
-            lat = p0.sheader['sensor_ycoordinate']
+            lon = p0.sheader['ship_xcoordinate']
+            lat = p0.sheader['ship_ycoordinate']
             zone = int((lon + 180.0) % 360.0 / 6) + 1
             hemisphere = 'S' if lat < 0.0 else 'N'
             sys.stdout.write('Detected UTM zone: %d%s\n' % (zone, hemisphere))
@@ -470,8 +470,11 @@ def export_SEGY(infile, outfile, (channel_number,), to_utm = True,
             assert p.cheader['num_samples'] == p0.cheader['num_samples']
             assert p.cheader['time_duration'] == p0.cheader['time_duration']
 
-            x, y = converter(p.sheader['sensor_xcoordinate'],
-                             p.sheader['sensor_ycoordinate'])
+            # Using sensor_[xy]coordinate seems to be more appropriate here,
+            # but in practice it's not. Chesapeake XTF-To-SEGY converter
+            # is also using ship_[xy]coordinate.
+            x, y = converter(p.sheader['ship_xcoordinate'],
+                             p.sheader['ship_ycoordinate'])
 
             trace_header = dict(
                 trace_seq_in_line = i + 1,
@@ -497,10 +500,6 @@ def export_SEGY(infile, outfile, (channel_number,), to_utm = True,
                 coordinates_scaler = scaler,
                 reciever_coord_x = int(round(x)),
                 reciever_coord_y = int(round(y)),
-
-                # Chesapeake XTF-To-SEGY does this, but I think it's wrong
-                #source_coord_x = ... p.sheader['ship_xcoordinate'] ... ,
-                #source_coord_y = ... p.sheader['ship_ycoordinate'] ... ,
 
                 #ensemble_num = ... # For marks when importing to Geographix
             )
