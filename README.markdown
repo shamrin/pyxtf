@@ -11,7 +11,7 @@
 * view [XTF (eXtended Triton Format)][XTF] files with subbottom seismic data
 * convert selected channels to [SEG-Y][] or (another) XTF file
 
-*Limitation:* side-scan data wasn't tested. It could work, though converting side-scan to SEG-Y doesn't make sense, obviously.
+*Limitation:* side-scan data wasn't tested. It could work, though converting side-scan to SEG-Y doesn't make sense, because SEG-Y is designed for subbottom seismic data.
 
 [XTF]: http://en.wikipedia.org/wiki/EXtended_Triton_Format
 [SEG-Y]: http://en.wikipedia.org/wiki/SEG_Y
