@@ -1,3 +1,5 @@
+**Note: if you are looking for Python XTF library, you may also want to check out https://github.com/oysstu/pyxtf**
+
 ## XTF Surveyor: eXtended Triton Format viewer and converter
 
 ![XTF Surveyor screenshot](doc/screenshot.png)
@@ -23,6 +25,8 @@ Underneath there are couple Python modules that could be helpful:
 * [xtf](xtf.py) - read and write XTF files, convert to SEG-Y;
 * [segy](segy.py) - read and write SEG-Y files;
 * [sacker](sacker.py) - wrapper around Python `struct` module (used by the modules above).
+
+**Note:** alternative Python XTF library by [@oysstu](https://github.com/oysstu): https://github.com/oysstu/pyxtf
 
 ### How to build installer (for Windows)
 
