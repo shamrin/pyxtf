@@ -26,7 +26,7 @@ Underneath there are couple Python modules that could be helpful:
 * [segy](segy.py) - read and write SEG-Y files;
 * [sacker](sacker.py) - wrapper around Python `struct` module (used by the modules above).
 
-**Note:** alternative Python XTF library by [@oysstu](https://github.com/oysstu): https://github.com/oysstu/pyxtf
+**Note:** another Python XTF library, by [@oysstu](https://github.com/oysstu): https://github.com/oysstu/pyxtf
 
 ### How to build installer (for Windows)
 
